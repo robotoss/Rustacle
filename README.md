@@ -62,20 +62,49 @@ rustacle/
 
 ## Getting Started
 
+### 1. Clone the repository
+
 ```bash
-# Clone the repository
 git clone https://github.com/your-org/rustacle.git
 cd rustacle
+```
 
-# Install frontend dependencies
+### 2. Install frontend dependencies
+
+**macOS / Linux (bash, zsh):**
+```bash
 cd ui && npm install && cd ..
+```
 
-# Build and run
+**Windows (PowerShell):**
+```powershell
+cd ui; npm install; cd ..
+```
+
+### 3. Build the frontend
+
+**macOS / Linux:**
+```bash
+cd ui && npm run build && cd ..
+```
+
+**Windows (PowerShell):**
+```powershell
+cd ui; npm run build; cd ..
+```
+
+### 4. Run the app
+
+```bash
 cargo run -p rustacle-app
 ```
 
+> **Note:** The project has two binaries. If cargo asks which one to run, use:
+> `cargo run -p rustacle-app --bin rustacle-app`
+
 ## Development
 
+**macOS / Linux:**
 ```bash
 # Run all checks locally
 bash scripts/check-local.sh
@@ -85,8 +114,29 @@ cargo fmt --all -- --check
 cargo clippy --workspace -- -D warnings
 cargo nextest run --workspace
 
+# Regenerate TypeScript bindings after changing Rust IPC types
+bash scripts/regen-bindings.sh
+
 # Run with debug logging
 RUSTACLE_LOG=debug cargo run -p rustacle-app
+```
+
+**Windows (PowerShell):**
+```powershell
+# Format check
+cargo fmt --all -- --check
+
+# Lint
+cargo clippy --workspace -- -D warnings
+
+# Tests
+cargo nextest run --workspace
+
+# Regenerate TypeScript bindings
+cargo run -p rustacle-app --bin export_bindings
+
+# Run with debug logging
+$env:RUSTACLE_LOG="debug"; cargo run -p rustacle-app
 ```
 
 ## Architecture
