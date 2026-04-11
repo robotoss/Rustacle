@@ -79,6 +79,9 @@ jobs:
 
   deny:
     runs-on: ubuntu-22.04
+    env:
+      RUSTC_WRAPPER: ""
+      SCCACHE_GHA_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2

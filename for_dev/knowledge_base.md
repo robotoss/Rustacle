@@ -361,6 +361,7 @@ TOCTOU: on Unix, prefer `openat` family via `rustix` so the scope check and open
 | PowerShell does not support `&&` operator | Use `;` to chain commands: `cd ui; npm install; cd ..` |
 | `cargo run -p rustacle-app` fails with "could not determine which binary" | Add `default-run = "rustacle-app"` to the `[package]` section |
 | Tauri `devUrl` causes ERR_CONNECTION_REFUSED on `cargo run` | Remove `devUrl`/`beforeDevCommand` from `tauri.conf.json`; use `frontendDist` only. Dev server is for `cargo tauri dev` only. |
+| cargo-deny Docker action fails with `sccache` not found | Override `RUSTC_WRAPPER: ""` and `SCCACHE_GHA_ENABLED: "false"` at job level for the `deny` job — the Docker container doesn't have sccache. |
 
 ---
 
