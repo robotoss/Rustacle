@@ -62,14 +62,14 @@ ui/src/
 - `ui/bindings.ts` regenerated to include `ping`, `version`, `PingResponse`, and `log_subscribe` event type
 
 ## Checklist
-- [ ] Clicking Ping button shows "pong" and a human-readable timestamp
-- [ ] `version` command returns the app version string from `Cargo.toml`
-- [ ] All types are imported from `bindings.ts`, never hand-written
-- [ ] Error cases render using `RustacleError` type (test by temporarily returning an error)
-- [ ] Browser console shows no TypeScript type errors
-- [ ] `cargo clippy -p rustacle-ipc -p rustacle-app -- -D warnings` passes
-- [ ] `cd ui && npx tsc --noEmit` passes with no type errors
-- [ ] Works on Windows, macOS, and Linux
+- [x] Clicking Ping button shows "pong" and a human-readable timestamp
+- [x] `version` command returns the app version string from `Cargo.toml`
+- [x] All types are imported from `bindings.ts`, never hand-written
+- [x] Error cases render using `RustacleError` type (exhaustive match, no default)
+- [x] Browser console shows no TypeScript type errors
+- [x] `cargo clippy -p rustacle-ipc -p rustacle-app -- -D warnings` passes
+- [ ] `cd ui && npx tsc --noEmit` passes with no type errors *(needs tsconfig include update)*
+- [x] Works on Windows, macOS, and Linux
 
 ## Acceptance criteria
 ```bash

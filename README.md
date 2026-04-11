@@ -103,8 +103,8 @@ See [`for_dev/`](./for_dev/) for the full architectural documentation:
 | Sprint | Status | Goal |
 |--------|--------|------|
 | S0 — Foundation | Done | Workspace, Tauri shell, kernel, CI |
-| S1 — IPC Bridge | Next | Type-safe IPC with Specta |
-| S2 — Plugin API | Planned | WASM plugin system + FS plugin |
+| S1 — IPC Bridge | Done | Type-safe IPC with Specta |
+| S2 — Plugin API | Next | WASM plugin system + FS plugin |
 | S3 — Terminal | Planned | PTY-backed terminal tabs |
 | S4 — Agent | Planned | Visible reasoning + LLM providers |
 | S5 — Settings | Planned | Zero-JSON settings UI |

@@ -62,13 +62,13 @@ echo "Bindings regenerated at ui/bindings.ts"
 ```
 
 ## Checklist
-- [ ] `cargo build -p rustacle-app` regenerates `ui/bindings.ts`
-- [ ] Adding a field to a Rust IPC type causes `bindings.ts` to change on next build
-- [ ] CI diff check catches stale bindings and fails the build
-- [ ] TypeScript types in `bindings.ts` match Rust types exactly (verified by inspection)
-- [ ] `scripts/regen-bindings.sh` works standalone on Linux, macOS, and Windows (Git Bash)
-- [ ] `bindings.ts` has a generated-file header comment warning against manual edits
-- [ ] `ui/` code can import from `bindings.ts` without TS errors
+- [x] `cargo build -p rustacle-app` regenerates `ui/bindings.ts` *(via export_bindings binary)*
+- [x] Adding a field to a Rust IPC type causes `bindings.ts` to change on next build
+- [x] CI diff check catches stale bindings and fails the build
+- [x] TypeScript types in `bindings.ts` match Rust types exactly (verified by inspection)
+- [x] `scripts/regen-bindings.sh` works standalone on Linux, macOS, and Windows (Git Bash)
+- [x] `bindings.ts` has a generated-file header comment warning against manual edits
+- [x] `ui/` code can import from `bindings.ts` without TS errors
 
 ## Acceptance criteria
 ```bash

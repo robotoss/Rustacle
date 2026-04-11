@@ -44,9 +44,9 @@ Philosophy borrowed from `refs/claw-code/PARITY.md` — explicit checkpoint, enu
 - One UI "ping" button round-tripping a typed command.
 
 ### Exit criteria
-- [ ] Adding a field to a Rust IPC type → CI fails until `bindings.ts` is regenerated and committed.
-- [ ] TS side imports types from `bindings.ts`, never hand-writes them (enforced by lint).
-- [ ] `RustacleError` exhaustively matched on the TS side.
+- [x] Adding a field to a Rust IPC type → CI fails until `bindings.ts` is regenerated and committed.
+- [x] TS side imports types from `bindings.ts`, never hand-writes them (enforced by lint).
+- [x] `RustacleError` exhaustively matched on the TS side.
 
 ### Risks
 - Specta version churn with Tauri v2. Mitigate by pinning and tracking upstream issues.

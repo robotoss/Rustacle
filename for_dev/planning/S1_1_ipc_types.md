@@ -53,13 +53,13 @@ crates/rustacle-ipc/
 - Event types are plain structs matching the topic registry in `architecture.md` section 4.6.
 
 ## Checklist
-- [ ] `RustacleError` has all five variants listed above
-- [ ] Each command module has at least one stub function with typed input/output
-- [ ] Event types match `architecture.md` section 4.6 topic registry
-- [ ] All public types derive `Serialize, Deserialize, specta::Type`
-- [ ] `cargo check -p rustacle-ipc` passes with no errors
-- [ ] `cargo clippy -p rustacle-ipc` passes with no warnings
-- [ ] `cargo doc -p rustacle-ipc --no-deps` builds without warnings
+- [x] `RustacleError` has all five variants listed above
+- [x] Each command module has at least one stub function with typed input/output
+- [x] Event types match `architecture.md` section 4.6 topic registry
+- [x] All public types derive `Serialize, Deserialize, specta::Type`
+- [x] `cargo check -p rustacle-ipc` passes with no errors
+- [x] `cargo clippy -p rustacle-ipc` passes with no warnings
+- [x] `cargo doc -p rustacle-ipc --no-deps` builds without warnings
 
 ## Acceptance criteria
 ```bash
