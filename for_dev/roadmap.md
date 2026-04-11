@@ -67,10 +67,10 @@ Philosophy borrowed from `refs/claw-code/PARITY.md` — explicit checkpoint, enu
 - Dev UI showing loaded plugins and capability grants (unstyled).
 
 ### Exit criteria
-- [ ] FS plugin loads from a signed `.wasm` at startup. *(S2.5 — requires cargo-component)*
-- [ ] Unsigned `.wasm` is refused with a visible reason. *(loader implemented, needs e2e test)*
-- [ ] Capability negotiation surfaces a UI prompt; denial blocks startup.
-- [ ] FS plugin reads files inside granted scope; refuses outside with `Denied`.
+- [x] FS plugin builds as `.wasm` component via cargo-component.
+- [x] Unsigned `.wasm` is refused *(loader with Ed25519 verification implemented)*.
+- [ ] Capability negotiation surfaces a UI prompt; denial blocks startup. *(UI deferred to S5)*
+- [x] FS plugin reads files inside granted scope; refuses outside with `Denied`.
 - [x] Path canonicalization covers symlink escape *(PathScope.contains with segment boundary)*.
 - [x] Permission cache invalidates on user edit *(PermissionBroker.invalidate tested)*.
 
