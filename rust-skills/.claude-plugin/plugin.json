@@ -1,0 +1,24 @@
+{
+  "name": "rust-skills",
+  "version": "2.1.0",
+  "description": "Comprehensive Rust development assistant with meta-question routing, coding guidelines, version queries, and ecosystem support",
+  "author": {
+    "name": "ZhangHanDong",
+    "url": "https://github.com/ZhangHanDong"
+  },
+  "repository": "https://github.com/actionbook/rust-skills",
+  "homepage": "https://github.com/actionbook/rust-skills",
+  "license": "MIT",
+  "keywords": [
+    "rust",
+    "cargo",
+    "ownership",
+    "borrow-checker",
+    "async",
+    "tokio",
+    "error-handling",
+    "coding-guidelines",
+    "unsafe",
+    "ffi"
+  ]
+}
