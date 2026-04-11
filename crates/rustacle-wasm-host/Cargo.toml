@@ -7,3 +7,13 @@ license.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+rustacle-plugin-api = { path = "../rustacle-plugin-api", version = "0.1.0" }
+async-trait = "0.1"
+bytes = "1"
+ed25519-dalek = { version = "2", features = ["std"] }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+tracing = "0.1"
+wasmtime = { version = "31", features = ["component-model"] }
