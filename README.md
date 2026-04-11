@@ -227,7 +227,7 @@ $env:RUSTACLE_LOG="debug"; cargo run -p rustacle-app
 | Property | proptest | Path canonicalization, backpressure |
 | E2E | Playwright | Full Tauri app UI flows |
 
-**Current tests (11):**
+**Current tests (17):**
 
 | Crate | Test | What it verifies |
 |-------|------|-----------------|
@@ -237,9 +237,15 @@ $env:RUSTACLE_LOG="debug"; cargo run -p rustacle-app
 | `rustacle-kernel` | `permission_allow_is_cached` | Grant caching in broker |
 | `rustacle-kernel` | `permission_deny_is_not_cached` | Deny not cached (retryable) |
 | `rustacle-kernel` | `invalidate_removes_grant` | Cache invalidation works |
+| `rustacle-kernel` | `broadcast_publish_subscribe` | Event bus broadcast pub/sub |
+| `rustacle-kernel` | `watch_coalesce_latest` | Event bus coalesce-latest policy |
+| `rustacle-kernel` | `publish_to_unknown_topic_fails` | Bus error on unknown topic |
+| `rustacle-kernel` | `register_all_terminal_topics` | Well-known topic registration |
 | `rustacle-plugin-api` | `path_scope_contains` | FS path scope segment matching |
 | `rustacle-plugin-api` | `host_pattern_exact` | Exact host matching |
 | `rustacle-plugin-api` | `host_pattern_wildcard` | Wildcard `*.example.com` matching |
+| `rustacle-plugin-terminal` | `detect_shell_returns_something` | Shell auto-detection |
+| `rustacle-plugin-terminal` | `pty_spawn_and_alive` | PTY spawn and child alive |
 | `rustacle-wasm-host` | `js_plugin_component_is_valid` | JS WASM component loads via wasmtime |
 | `rustacle-wasm-host` | `rust_fs_plugin_component_is_valid` | Rust WASM component loads via wasmtime |
 
@@ -255,7 +261,7 @@ cargo test -p rustacle-kernel -- permission
 | S0 — Foundation | Done | Workspace, Tauri shell, kernel, CI |
 | S1 — IPC Bridge | Done | Type-safe IPC with Specta |
 | S2 — Plugin System | Done | WASM plugin system + FS plugin + demo integration |
-| S3 — Terminal | Next | PTY-backed terminal tabs |
+| S3 — Terminal | Done | PTY-backed terminal tabs + xterm.js UI |
 | S4 — Agent | Planned | Visible reasoning + LLM providers |
 | S5 — Settings | Planned | Zero-JSON settings UI |
 | S6 — Multi-tab | Planned | Splits, tool redirection |

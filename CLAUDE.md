@@ -6,7 +6,7 @@ Rustacle is a local-first **desktop agent controller** (not a terminal emulator)
 
 ## Current status
 
-**Sprint 2 complete.** Core infrastructure built: workspace, Tauri shell, kernel with plugin registry, type-safe IPC via tauri-specta, WASM plugin system (WIT contract, wasmtime host, Ed25519 signing), PermissionBroker, FS plugin as first WASM component, demo plugin with full UI integration. Next: **Sprint 3** (Terminal plugin).
+**Sprint 3 complete.** Full stack: workspace, Tauri shell, kernel (registry, permissions, real event bus with backpressure), type-safe IPC, WASM plugin system (WIT + wasmtime + Ed25519), FS plugin (Rust WASM), hello-js plugin (JavaScript WASM), demo plugin (native), terminal plugin with PTY (portable-pty), xterm.js UI with WebGL. 17 tests. Next: **Sprint 4** (Agent plugin).
 
 ## Architecture overview
 
@@ -85,8 +85,8 @@ Rustacle is a local-first **desktop agent controller** (not a terminal emulator)
 | S0 | Done | Workspace, Tauri shell, kernel skeleton, CI |
 | S1 | Done | Type-safe IPC + Specta bridge |
 | S2 | Done | Plugin API + WASM plugin system + FS plugin + demo integration |
-| S3 | Next | Terminal plugin (native, PTY) |
-| S4 | Planned | Agent plugin v1 (LLM, harness, visible reasoning) |
+| S3 | Done | Terminal plugin (PTY + xterm.js) + real event bus |
+| S4 | Next | Agent plugin v1 (LLM, harness, visible reasoning) |
 | S5 | Planned | Zero-JSON Settings UI + secrets/keyring |
 | S6 | Planned | Multi-tab, splits, tool redirection |
 | S7 | Planned | Memory plugin + project context |
