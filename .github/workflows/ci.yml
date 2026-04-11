@@ -66,6 +66,14 @@ jobs:
       - name: Install nextest
         uses: taiki-e/install-action@nextest
 
+      - name: Check bindings are up-to-date
+        run: |
+          cargo run -p rustacle-app --bin export_bindings
+          git diff --exit-code ui/bindings.ts || {
+            echo "ERROR: ui/bindings.ts is out of date. Run scripts/regen-bindings.sh and commit."
+            exit 1
+          }
+
       - name: Test
         run: cargo nextest run --workspace
 
