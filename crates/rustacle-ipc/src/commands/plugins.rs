@@ -22,3 +22,18 @@ pub enum PluginState {
 pub struct ListPluginsResponse {
     pub plugins: Vec<PluginSummary>,
 }
+
+/// Request to call a plugin command.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct PluginCallRequest {
+    pub plugin_id: String,
+    pub command: String,
+    pub payload: String,
+}
+
+/// Response from a plugin command call.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct PluginCallResponse {
+    pub plugin_id: String,
+    pub data: String,
+}

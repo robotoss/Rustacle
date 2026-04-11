@@ -6,17 +6,52 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 
 /** Commands */
 export const commands = {
-	// Ping command — proves IPC round-trip works.
+	// Ping command — proves direct IPC round-trip works.
 	ping: () => typedError<PingResponse, RustacleError>(__TAURI_INVOKE("ping")),
 	// Version command — returns the app version from Cargo.toml.
 	version: () => __TAURI_INVOKE<string>("version"),
+	// List all loaded plugins.
+	listPlugins: () => typedError<ListPluginsResponse, RustacleError>(__TAURI_INVOKE("list_plugins")),
+	/**
+	 *  Call a plugin command through the kernel registry.
+	 *  This is the core integration proof: UI → IPC → Kernel → Plugin → back.
+	 */
+	pluginCall: (request: PluginCallRequest) => typedError<PluginCallResponse, RustacleError>(__TAURI_INVOKE("plugin_call", { request })),
 };
 
 /* Types */
+// Response from `list_plugins`.
+export type ListPluginsResponse = {
+	plugins: PluginSummary[],
+};
+
 // Response from the `ping` command.
 export type PingResponse = {
 	message: string,
 	timestamp: number,
+};
+
+// Request to call a plugin command.
+export type PluginCallRequest = {
+	plugin_id: string,
+	command: string,
+	payload: string,
+};
+
+// Response from a plugin command call.
+export type PluginCallResponse = {
+	plugin_id: string,
+	data: string,
+};
+
+// Plugin lifecycle state.
+export type PluginState = "Loading" | "Running" | "Suspended" | "Error";
+
+// Summary of a loaded plugin.
+export type PluginSummary = {
+	id: string,
+	version: string,
+	state: PluginState,
 };
 
 /**
