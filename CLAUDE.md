@@ -2,7 +2,7 @@
 
 ## What is this project
 
-Rustacle is a local-first **agentic terminal** built on **Rust + Tauri v2**. Micro-kernel architecture: small kernel (lifecycle, IPC, permissions, event bus) + hot-swappable WASM plugins for all features (chat, terminal, agent, FS, memory, skills). Visible agent reasoning, zero-JSON config, capability-gated everything.
+Rustacle is a local-first **desktop agent controller** (not a terminal emulator) built on **Rust + Tauri v2**. It is a native UI where users interact with AI agents that can use tools, access files, and run commands — with every action visible and permissioned. Micro-kernel architecture: small kernel (lifecycle, IPC, permissions, event bus) + hot-swappable WASM plugins for all features (chat, agent, FS, memory, skills). Visible agent reasoning, zero-JSON config, capability-gated everything. Licensed under CC BY-NC 4.0 (non-commercial).
 
 ## Current status
 

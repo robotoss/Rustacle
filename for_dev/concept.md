@@ -6,7 +6,7 @@
 
 ## 1. The one-line pitch
 
-**Rustacle is a local-first, agentic terminal where the agent's reasoning is visible, every action is permissioned, every setting lives in a UI, and every feature is a hot-swappable module.**
+**Rustacle is a local-first desktop agent controller where the agent's reasoning is visible, every action is permissioned, every setting lives in a UI, and every feature is a hot-swappable module.**
 
 ## 2. The problem
 
@@ -25,7 +25,7 @@ Neither gives the power user what they actually want:
 
 ## 3. The product
 
-A native desktop terminal app on Rust + Tauri with:
+A native desktop agent controller on Rust + Tauri with:
 
 - **Multi-tab, multi-split shells** with per-tab agent context and tool-use redirection (see [`ui_ux_manifesto.md` §2](./ui_ux_manifesto.md)).
 - **A visible Agent Panel** streaming the agent's `Thought → ToolCall → Observation → Answer` as typed event cards in real time (see [`agent_reasoning.md` §1](./agent_reasoning.md)).
