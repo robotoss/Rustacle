@@ -131,7 +131,7 @@ rustacle/
 │   ├── rustacle-llm-openai/      # OpenAI-compatible provider
 │   ├── rustacle-llm-anthropic/   # Anthropic provider
 │   ├── rustacle-llm-local/       # Ollama / LM Studio provider
-│   ├── rustacle-agent/           # Agent prompt assembly + turn context
+│   ├── rustacle-agent/           # Agent prompt assembly, harness loop, tool dispatch
 │   └── rustacle-app/             # Tauri v2 binary + IPC commands
 ├── plugins/                      # Plugin crates (WASM + native)
 │   ├── fs/                       # File system plugin (WASM)
@@ -228,7 +228,7 @@ $env:RUSTACLE_LOG="debug"; cargo run -p rustacle-app
 | Property | proptest | Path canonicalization, backpressure |
 | E2E | Playwright | Full Tauri app UI flows |
 
-**Current tests (37):**
+**Current tests (48):**
 
 | Crate | Test | What it verifies |
 |-------|------|-----------------|
@@ -269,6 +269,17 @@ $env:RUSTACLE_LOG="debug"; cargo run -p rustacle-app
 | `rustacle-agent` | `truncate_over_budget` | Over-budget text is truncated with marker |
 | `rustacle-agent` | `filters_by_permission` | Tool schemas filtered by permission grants |
 | `rustacle-agent` | `schemas_sorted_by_name` | Tool schemas sorted alphabetically for determinism |
+| `rustacle-agent` | `cancel_propagates_to_child` | Cancel token propagates to child tokens |
+| `rustacle-agent` | `child_cancel_does_not_propagate_up` | Child cancel doesn't affect parent |
+| `rustacle-agent` | `flush_on_sentence_end` | Thought buffer flushes on sentence boundary |
+| `rustacle-agent` | `no_flush_on_short_text` | Short text doesn't trigger flush |
+| `rustacle-agent` | `flush_on_newline` | Thought buffer flushes on newline |
+| `rustacle-agent` | `take_clears_buffer` | Take empties the thought buffer |
+| `rustacle-agent` | `parsed_tool_call_json_roundtrip` | Tool call JSON parsing round-trip |
+| `rustacle-agent` | `budget_check` | Budget guardrail limits enforced |
+| `rustacle-agent` | `dispatch_registered_tool` | Registered tool dispatches correctly |
+| `rustacle-agent` | `dispatch_unknown_tool_uses_placeholder` | Unknown tool uses placeholder |
+| `rustacle-agent` | `names_sorted` | Tool dispatch table names are sorted |
 
 ```bash
 cargo nextest run --workspace
@@ -283,8 +294,8 @@ cargo test -p rustacle-kernel -- permission
 | S1 — IPC Bridge | Done | Type-safe IPC with Specta |
 | S2 — Plugin System | Done | WASM plugin system + FS plugin + demo integration |
 | S3 — Terminal | Done | PTY-backed terminal tabs + xterm.js UI |
-| S4 — Agent | In Progress | Visible reasoning + LLM providers |
-| S5 — Settings | Planned | Zero-JSON settings UI |
+| S4 — Agent | Done | Visible reasoning + LLM providers |
+| S5 — Settings | Next | Zero-JSON settings UI |
 | S6 — Multi-tab | Planned | Splits, tool redirection |
 | S7 — Memory | Planned | Long-term memory + project context |
 | S8 — Shipping | Planned | Hardening, telemetry, packaging |

@@ -3,6 +3,7 @@ import { commands } from "../bindings";
 import PingButton from "./components/common/PingButton";
 import PluginDemo from "./components/common/PluginDemo";
 import TerminalTab from "./components/terminal/Tab";
+import AgentPanel from "./components/agent/AgentPanel";
 
 type View = "home" | "terminal";
 
@@ -58,6 +59,9 @@ export default function App() {
         )}
         {view === "terminal" && <TerminalTab />}
       </main>
+
+      {/* Agent reasoning panel (Ctrl+J to toggle) */}
+      <AgentPanel />
     </div>
   );
 }

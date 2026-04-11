@@ -6,11 +6,11 @@ Rustacle is a local-first **desktop agent controller** (not a terminal emulator)
 
 ## Current status
 
-**Sprint 3 complete.** Full stack: workspace, Tauri shell, kernel (registry, permissions, real event bus with backpressure), type-safe IPC, WASM plugin system (WIT + wasmtime + Ed25519), FS plugin (Rust WASM), hello-js plugin (JavaScript WASM), demo plugin (native), terminal plugin with PTY (portable-pty), xterm.js UI with WebGL. 17 tests. Next: **Sprint 4** (Agent plugin).
+**Sprint 4 complete.** Full stack: workspace, Tauri shell, kernel (registry, permissions, real event bus with backpressure), type-safe IPC, WASM plugin system (WIT + wasmtime + Ed25519), FS plugin (Rust WASM), hello-js plugin (JavaScript WASM), demo plugin (native), terminal plugin with PTY (portable-pty), xterm.js UI with WebGL, LLM provider trait with OpenAI streaming + local server discovery, deterministic 8-layer prompt assembly with insta golden tests, ReAct harness loop with cancel tokens and budget guardrails, tool dispatch table with 7 stock tools, agent panel UI with reasoning cards. 48 tests. Next: **Sprint 5** (Zero-JSON Settings UI).
 
 ## Architecture overview
 
-- **Core crates** (`crates/`): `rustacle-kernel` (lifecycle, registry, permissions, bus), `rustacle-ipc` (typed commands/events/errors), `rustacle-plugin-api` (RustacleModule trait, Capability, Manifest), `rustacle-plugin-wit` (WIT contract), `rustacle-wasm-host` (wasmtime loader, linker), `rustacle-settings`, `rustacle-llm`, `rustacle-llm-{openai,anthropic,local}`, `rustacle-app` (Tauri binary)
+- **Core crates** (`crates/`): `rustacle-kernel` (lifecycle, registry, permissions, bus), `rustacle-ipc` (typed commands/events/errors), `rustacle-plugin-api` (RustacleModule trait, Capability, Manifest), `rustacle-plugin-wit` (WIT contract), `rustacle-wasm-host` (wasmtime loader, linker), `rustacle-settings`, `rustacle-llm`, `rustacle-llm-{openai,anthropic,local}`, `rustacle-agent` (prompt assembly, harness loop, tool dispatch), `rustacle-app` (Tauri binary)
 - **WASM Plugins** (`plugins/`): `fs` (built via cargo-component, wasm32-wasip1), `chat`, `agent`, `memory`, `skills` — excluded from workspace, built separately
 - **Native Plugins**: `terminal` (in workspace, implements RustacleModule directly)
 - **Demo Plugin**: `DemoPlugin` in kernel crate — proves full UI→IPC→Kernel→Plugin pipeline
@@ -86,8 +86,8 @@ Rustacle is a local-first **desktop agent controller** (not a terminal emulator)
 | S1 | Done | Type-safe IPC + Specta bridge |
 | S2 | Done | Plugin API + WASM plugin system + FS plugin + demo integration |
 | S3 | Done | Terminal plugin (PTY + xterm.js) + real event bus |
-| S4 | Next | Agent plugin v1 (LLM, harness, visible reasoning) |
-| S5 | Planned | Zero-JSON Settings UI + secrets/keyring |
+| S4 | Done | Agent plugin v1 (LLM, harness, visible reasoning) |
+| S5 | Next | Zero-JSON Settings UI + secrets/keyring |
 | S6 | Planned | Multi-tab, splits, tool redirection |
 | S7 | Planned | Memory plugin + project context |
 | S8 | Planned | Hardening, telemetry, packaging |
