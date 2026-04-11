@@ -75,6 +75,12 @@ impl HostPattern {
         Self { pattern }
     }
 
+    /// The raw pattern string.
+    #[must_use]
+    pub fn pattern(&self) -> &str {
+        &self.pattern
+    }
+
     /// Check if a hostname matches this pattern.
     #[must_use]
     pub fn matches(&self, host: &str) -> bool {
