@@ -1,8 +1,9 @@
-# ADR-0001 — UI Framework: Solid vs React
+# ADR-0001 — UI Framework: React 19
 
-- **Status**: Proposed (to ratify at end of Sprint 0)
+- **Status**: Accepted
 - **Date proposed**: 2026-04-09
-- **Decider**: Lead Architect + UI engineer
+- **Date accepted**: 2026-04-11
+- **Decider**: Lead Architect
 - **Supersedes**: —
 - **Superseded by**: —
 
@@ -12,73 +13,34 @@ Rustacle's UI lives in a Tauri v2 webview and drives three hot paths:
 
 1. **Terminal widget** (`xterm.js`) — 60 fps scroll at 100k lines.
 2. **Reasoning panel** — streaming token updates with sub-100 ms latency, thousands of cards.
-3. **Settings UI** — large, deeply nested typed form (Zero-JSON philosophy — see `../ui_ux_manifesto.md` §1).
+3. **Settings UI** — large, deeply nested typed form (Zero-JSON philosophy).
 
-We need a framework that handles streaming without jank, renders large virtualized lists, and has a healthy forms + a11y story.
+## Decision
 
-Both candidates have been used successfully with Tauri v2; both work with `bindings.ts` and `@tanstack/virtual`.
+**React 19** with Zustand for state management, Tailwind CSS v4 for styling.
 
-## Options
+### Rationale
 
-### A) SolidJS 1.x
+- **Ecosystem maturity**: `react-aria` for a11y, `@tanstack/virtual` for virtualization, `react-hook-form` + `zod` for the massive Settings UI — all production-grade.
+- **tauri-specta integration**: React is the primary target for `tauri-specta` examples and testing.
+- **React 19 compiler**: closes the performance gap with Solid for most UI surfaces via automatic memoization.
+- **Zustand**: minimal, typed, works well with Tauri's async IPC pattern.
+- **Developer pool**: larger community means easier onboarding and more resources.
 
-**Pros**
-- Fine-grained reactivity (signals). Token-streaming updates a single text node without rerendering a component tree.
-- Lower allocations on hot paths; fewer GC spikes during long turns.
-- Small runtime; bundle stays slim (helps cold-start target < 400 ms).
-- First-class stores (`createStore`) are typed and ergonomic.
-- Works cleanly with our `bindings.ts` since types are just TS.
+### Trade-offs accepted
 
-**Cons**
-- Smaller ecosystem; fewer prebuilt components (we'd build ours anyway to hit the UI manifesto).
-- Hiring pool narrower than React.
-- Less battle-tested a11y tooling compared to `react-aria`.
-
-### B) React 19
-
-**Pros**
-- Huge ecosystem (virtualization, forms, a11y, theming).
-- Bigger hiring pool.
-- React 19's compiler closes some of Solid's perf gap.
-- `react-aria` is the gold standard for a11y primitives.
-
-**Cons**
-- Heavier runtime; streaming paths allocate more.
-- State management choice is another decision (Zustand? Jotai?).
-- More effort to hit the cold-start budget.
-
-## Decision criteria
-
-| Criterion | Weight | Solid | React |
-|---|---|---|---|
-| Streaming perf (reasoning panel) | High | ✅ | ⚠️ (requires careful memoization) |
-| Terminal widget integration | Medium | ✅ | ✅ |
-| Ecosystem (a11y, forms, virtualization) | High | ⚠️ | ✅ |
-| Cold-start bundle size | High | ✅ | ⚠️ |
-| Hiring / onboarding | Medium | ⚠️ | ✅ |
-| Typed IPC binding ergonomics | Medium | ✅ | ✅ |
-| Settings UI depth | Medium | ✅ | ✅ |
-
-## Proposed Decision
-
-**Proceed with SolidJS** for Rustacle 1.0.
-
-Rationale: the two hardest UI surfaces (streaming reasoning panel and terminal scrollback) are both allocation-sensitive; Solid's signal model matches them naturally. Cold-start budget is tight; Solid's runtime helps. A11y gaps are real but manageable by adopting `corvu` / `kobalte` (Solid's a11y primitives inspired by `react-aria`) and filling gaps ourselves.
-
-Hiring risk is acknowledged and mitigated by (a) keeping UI code conventional (no exotic patterns), (b) strong types and tests, (c) thorough docs.
+- Heavier runtime than Solid — mitigated by React 19 compiler and careful virtualization.
+- Cold-start budget tighter — mitigated by code splitting and lazy loading.
+- Streaming panel needs explicit optimization — `useSyncExternalStore` + Zustand subscriptions.
 
 ## Consequences
 
-- `ui/` ships with Solid + Vite + Tailwind.
-- State: `createStore` + signals, no separate state library.
-- Forms: `@modular-forms/solid` + `zod`.
-- Routing: `@solidjs/router` (minimal use; most of the app is modal/palette-driven).
-- A11y primitives: `kobalte` + custom.
-- Re-evaluation trigger: if by Sprint 6 we measure the reasoning panel missing its 60 fps budget on mid-tier hardware, we re-open this ADR.
-
-## Ratification
-
-Pending sign-off at Sprint 0 demo. Until ratified, `ui/` is untouched beyond a placeholder page in Sprint 0.
+- `ui/` ships with React 19 + Vite + Tailwind CSS v4.
+- State: Zustand stores with typed slices.
+- Forms: `react-hook-form` + `zod`.
+- A11y: `react-aria` components.
+- Virtualization: `@tanstack/react-virtual`.
+- Re-evaluation trigger: if by Sprint 6 reasoning panel misses 60 fps on mid-tier hardware.
 
 ---
-*Related: [README](../README.md) · [ui_ux_manifesto](../ui_ux_manifesto.md) · [tech_stack_2026](../tech_stack_2026.md)*
+*Related: [README](../README.md) · [ui_ux_manifesto](../ui_ux_manifesto.md)*
