@@ -7,3 +7,11 @@ license.workspace = true
 
 [lints]
 workspace = true
+
+[dependencies]
+async-trait = "0.1"
+bytes = "1"
+serde = { version = "1", features = ["derive"] }
+semver = { version = "1", features = ["serde"] }
+specta = { version = "=2.0.0-rc.24", features = ["derive"] }
+thiserror = "2"
