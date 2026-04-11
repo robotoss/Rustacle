@@ -9,7 +9,7 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-rustacle-plugin-api = { path = "../rustacle-plugin-api" }
+rustacle-plugin-api = { path = "../rustacle-plugin-api", version = "0.1.0" }
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

@@ -17,8 +17,8 @@ workspace = true
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-rustacle-kernel = { path = "../rustacle-kernel" }
-rustacle-ipc = { path = "../rustacle-ipc" }
+rustacle-kernel = { path = "../rustacle-kernel", version = "0.1.0" }
+rustacle-ipc = { path = "../rustacle-ipc", version = "0.1.0" }
 tauri = { version = "2", features = [] }
 tauri-specta = { version = "=2.0.0-rc.24", features = ["derive", "typescript"] }
 specta = { version = "=2.0.0-rc.24", features = ["derive"] }
