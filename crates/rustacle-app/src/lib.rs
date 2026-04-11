@@ -37,7 +37,9 @@ fn version() -> String {
 /// List all loaded plugins.
 #[tauri::command]
 #[specta::specta]
-async fn list_plugins(state: tauri::State<'_, AppState>) -> Result<ListPluginsResponse, RustacleError> {
+async fn list_plugins(
+    state: tauri::State<'_, AppState>,
+) -> Result<ListPluginsResponse, RustacleError> {
     let ids = state.registry.list_ids().await;
     let plugins = ids
         .into_iter()

@@ -2,8 +2,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use bytes::Bytes;
 use rustacle_plugin_api::{
-    ModuleError, ModuleManifest, RustacleModule, UiContributions,
-    PanelDesc, PaletteEntry,
+    ModuleError, ModuleManifest, PaletteEntry, PanelDesc, RustacleModule, UiContributions,
 };
 use serde::{Deserialize, Serialize};
 
@@ -108,8 +107,10 @@ impl RustacleModule for DemoPlugin {
                     .map_err(|e| ModuleError::Internal(e.to_string()))
             }
             "echo" => {
-                let req: EchoRequest = serde_json::from_slice(&payload)
-                    .map_err(|e| ModuleError::InvalidInput { reason: e.to_string() })?;
+                let req: EchoRequest =
+                    serde_json::from_slice(&payload).map_err(|e| ModuleError::InvalidInput {
+                        reason: e.to_string(),
+                    })?;
                 let resp = EchoResponse {
                     length: req.text.len(),
                     echoed: format!("[demo] {}", req.text),

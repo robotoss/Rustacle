@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use tokio::sync::{broadcast, watch, RwLock};
+use tokio::sync::{RwLock, broadcast, watch};
 
 /// A typed event bus with per-topic backpressure policies.
 ///
@@ -109,10 +109,7 @@ impl Bus {
     ///
     /// # Errors
     /// Returns an error if the topic is not registered or is not `CoalesceLatest`.
-    pub async fn subscribe_watch(
-        &self,
-        topic: &str,
-    ) -> Result<watch::Receiver<Bytes>, BusError> {
+    pub async fn subscribe_watch(&self, topic: &str) -> Result<watch::Receiver<Bytes>, BusError> {
         let topics = self.watch_topics.read().await;
         let tx = topics
             .get(topic)
@@ -214,7 +211,11 @@ mod tests {
         bus.register_terminal_topics().await;
 
         // Should be able to subscribe to all registered topics
-        assert!(bus.subscribe_broadcast(BusTopics::TERMINAL_OUTPUT).await.is_ok());
+        assert!(
+            bus.subscribe_broadcast(BusTopics::TERMINAL_OUTPUT)
+                .await
+                .is_ok()
+        );
         assert!(bus.subscribe_watch(BusTopics::TERMINAL_CWD).await.is_ok());
         assert!(
             bus.subscribe_broadcast(BusTopics::AGENT_REASONING)

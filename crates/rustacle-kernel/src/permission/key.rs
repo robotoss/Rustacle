@@ -18,7 +18,9 @@ impl From<&Capability> for CapabilityKey {
                 read_write: *mode == rustacle_plugin_api::FsMode::ReadWrite,
             },
             Capability::Net { allow_hosts } => Self::Net {
-                host: allow_hosts.first().map_or_else(String::new, |h| h.pattern().to_string()),
+                host: allow_hosts
+                    .first()
+                    .map_or_else(String::new, |h| h.pattern().to_string()),
             },
             Capability::Pty => Self::Pty,
             Capability::Secret { key } => Self::Secret { key: key.clone() },

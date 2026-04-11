@@ -90,9 +90,7 @@ mod tests {
     #[tokio::test]
     async fn registry_call_unknown_plugin() {
         let registry = PluginRegistry::new();
-        let result = registry
-            .call("nonexistent", "ping", Bytes::new())
-            .await;
+        let result = registry.call("nonexistent", "ping", Bytes::new()).await;
         assert!(result.is_err());
     }
 }

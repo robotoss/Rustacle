@@ -11,7 +11,7 @@ pub struct WasmHostConfig {
 impl Default for WasmHostConfig {
     fn default() -> Self {
         Self {
-            fuel_limit: 10_000_000,        // 10M instructions
+            fuel_limit: 10_000_000,         // 10M instructions
             memory_limit: 64 * 1024 * 1024, // 64 MiB
         }
     }

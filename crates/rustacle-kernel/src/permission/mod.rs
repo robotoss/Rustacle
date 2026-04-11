@@ -31,11 +31,7 @@ impl PermissionBroker {
     ///
     /// # Errors
     /// Returns `ModuleError::Denied` if the user denies the capability.
-    pub async fn check(
-        &self,
-        plugin_id: &str,
-        cap: &Capability,
-    ) -> Result<(), ModuleError> {
+    pub async fn check(&self, plugin_id: &str, cap: &Capability) -> Result<(), ModuleError> {
         let key = CapabilityKey::from(cap);
         let cache_key = (plugin_id.to_string(), key.clone());
 
@@ -65,7 +61,10 @@ impl PermissionBroker {
         let grant = Grant { decision };
 
         // Only cache Allow decisions — denials can be retried.
-        if matches!(grant.decision, PermissionDecision::Allow | PermissionDecision::AllowSession) {
+        if matches!(
+            grant.decision,
+            PermissionDecision::Allow | PermissionDecision::AllowSession
+        ) {
             self.grants.insert(cache_key, grant.clone());
         }
 
