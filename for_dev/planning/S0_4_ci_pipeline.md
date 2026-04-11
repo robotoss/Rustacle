@@ -57,13 +57,20 @@ jobs:
 ```
 
 ### `deny.toml` (project root)
+
+> **Note (cargo-deny v0.19+):** The `[advisories]` section uses scope values
+> (`all`, `workspace`, `transitive`, `none`) instead of action keywords
+> (`deny`, `warn`, `allow`). Exception: `yanked` still uses action keywords.
+
 ```toml
 [advisories]
-vulnerability = "deny"
-unmaintained = "warn"
+vulnerability = "all"
+unmaintained = "workspace"
+unsound = "all"
+yanked = "deny"
 
 [licenses]
-allow = ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Zlib", "Unicode-3.0"]
+allow = ["MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Zlib", "Unicode-3.0", "Unicode-DFS-2016", "MPL-2.0"]
 confidence-threshold = 0.8
 
 [bans]

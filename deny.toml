@@ -1,6 +1,9 @@
 [advisories]
-vulnerability = "deny"
-unmaintained = "warn"
+# Scope for vulnerability checking: all, workspace, transitive, none
+vulnerability = "all"
+unmaintained = "workspace"
+unsound = "all"
+yanked = "deny"
 
 [licenses]
 allow = [

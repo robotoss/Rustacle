@@ -353,6 +353,17 @@ TOCTOU: on Unix, prefer `openat` family via `rustix` so the scope check and open
 
 ---
 
+## 5.1 CI / tooling gotchas
+
+| Gotcha | Fix |
+|---|---|
+| `cargo-deny` v0.19+ changed `[advisories]` config format | Use scope values (`all`, `workspace`, `transitive`, `none`) instead of action keywords (`deny`, `warn`). Exception: `yanked` still uses actions. |
+| PowerShell does not support `&&` operator | Use `;` to chain commands: `cd ui; npm install; cd ..` |
+| `cargo run -p rustacle-app` fails with "could not determine which binary" | Add `default-run = "rustacle-app"` to the `[package]` section |
+| Tauri `devUrl` causes ERR_CONNECTION_REFUSED on `cargo run` | Remove `devUrl`/`beforeDevCommand` from `tauri.conf.json`; use `frontendDist` only. Dev server is for `cargo tauri dev` only. |
+
+---
+
 ## 6. Quick references
 
 - **Glossary** — [`glossary.md`](./glossary.md).
