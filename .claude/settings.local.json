@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Skill(git-commit-helper)",
-      "Bash(git add:*)"
-    ]
-  }
-}
