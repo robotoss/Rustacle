@@ -8,6 +8,9 @@ Cargo.lock
 # Generated WASM bindings (cargo-component generates these)
 plugins/*/src/bindings.rs
 
+# Compiled WASM plugin artifacts
+plugins/*/*.wasm
+
 # Node
 node_modules/
 ui/dist/
