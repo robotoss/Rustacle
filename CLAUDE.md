@@ -6,14 +6,16 @@ Rustacle is a local-first **agentic terminal** built on **Rust + Tauri v2**. Mic
 
 ## Current status
 
-**Pre-code phase.** All architectural docs live in `for_dev/`. No Rust crates or UI code exist yet. Next step is **Sprint 0** (workspace setup, Tauri shell, kernel skeleton, CI).
+**Sprint 2 complete.** Core infrastructure built: workspace, Tauri shell, kernel with plugin registry, type-safe IPC via tauri-specta, WASM plugin system (WIT contract, wasmtime host, Ed25519 signing), PermissionBroker, FS plugin as first WASM component, demo plugin with full UI integration. Next: **Sprint 3** (Terminal plugin).
 
 ## Architecture overview
 
-- **Core crates** (`crates/`): `rustacle-kernel`, `rustacle-ipc`, `rustacle-plugin-api`, `rustacle-plugin-wit`, `rustacle-wasm-host`, `rustacle-settings`, `rustacle-llm`, `rustacle-llm-{openai,anthropic,local}`, `rustacle-app`
-- **Plugins** (`plugins/`): `fs` (wasm), `terminal` (native), `chat` (wasm), `agent` (wasm), `memory` (wasm), `skills` (wasm)
-- **Frontend** (`ui/`): Framework TBD (ADR-0001: Solid vs React), Vite, `bindings.ts` generated via `tauri-specta`
-- **IPC**: Tauri v2 commands (req/res) + events (streams), all typed via `specta`
+- **Core crates** (`crates/`): `rustacle-kernel` (lifecycle, registry, permissions, bus), `rustacle-ipc` (typed commands/events/errors), `rustacle-plugin-api` (RustacleModule trait, Capability, Manifest), `rustacle-plugin-wit` (WIT contract), `rustacle-wasm-host` (wasmtime loader, linker), `rustacle-settings`, `rustacle-llm`, `rustacle-llm-{openai,anthropic,local}`, `rustacle-app` (Tauri binary)
+- **WASM Plugins** (`plugins/`): `fs` (built via cargo-component, wasm32-wasip1), `chat`, `agent`, `memory`, `skills` — excluded from workspace, built separately
+- **Native Plugins**: `terminal` (in workspace, implements RustacleModule directly)
+- **Demo Plugin**: `DemoPlugin` in kernel crate — proves full UI→IPC→Kernel→Plugin pipeline
+- **Frontend** (`ui/`): React 19 + Vite + Tailwind CSS v4, `bindings.ts` auto-generated via tauri-specta
+- **IPC**: Tauri v2 commands (req/res) + events (streams), all typed via `specta`, CI-enforced sync
 
 ## Key documents
 
@@ -22,7 +24,7 @@ Rustacle is a local-first **agentic terminal** built on **Rust + Tauri v2**. Mic
 - `for_dev/project_structure.md` — full crate/file layout (authoritative)
 - `for_dev/roadmap.md` — Sprint 0-8 plan with exit criteria
 - `for_dev/planning/` — per-task briefs for sub-agents (S0_1 through S8_4)
-- `for_dev/knowledge_base.md` — Rust patterns, error handling, DX guidelines, security
+- `for_dev/knowledge_base.md` — Rust patterns, error handling, DX guidelines, security, CI gotchas
 - `for_dev/modularity.md` — core vs plugins, event bus, extension points
 - `for_dev/agent_reasoning.md` — harness loop, prompt assembly, tool dispatch
 - `for_dev/prompts_catalog.md` — system prompts verbatim
@@ -70,21 +72,39 @@ Rustacle is a local-first **agentic terminal** built on **Rust + Tauri v2**. Mic
 - Property: `proptest` for parsers, canonicalizer, backpressure
 - Golden prompt tests **mandatory** for any change to `plugins/agent/src/prompt/`
 
+### WASM plugins
+- Built via `cargo component build` with target `wasm32-wasip1`
+- Excluded from workspace — each has standalone `Cargo.toml`
+- WIT contract in `crates/rustacle-plugin-wit/wit/rustacle.wit`
+- Must be Ed25519-signed before loading (`scripts/sign-plugin.sh`)
+
 ## Sprint plan (summary)
 
-| Sprint | Goal |
-|--------|------|
-| S0 | Workspace, Tauri shell, kernel skeleton, CI |
-| S1 | Type-safe IPC + Specta bridge |
-| S2 | Plugin API + first WASM plugin (fs) |
-| S3 | Terminal plugin (native, PTY) |
-| S4 | Agent plugin v1 (LLM, harness, visible reasoning) |
-| S5 | Zero-JSON Settings UI + secrets/keyring |
-| S6 | Multi-tab, splits, tool redirection |
-| S7 | Memory plugin + project context |
-| S8 | Hardening, telemetry, packaging |
+| Sprint | Status | Goal |
+|--------|--------|------|
+| S0 | Done | Workspace, Tauri shell, kernel skeleton, CI |
+| S1 | Done | Type-safe IPC + Specta bridge |
+| S2 | Done | Plugin API + WASM plugin system + FS plugin + demo integration |
+| S3 | Next | Terminal plugin (native, PTY) |
+| S4 | Planned | Agent plugin v1 (LLM, harness, visible reasoning) |
+| S5 | Planned | Zero-JSON Settings UI + secrets/keyring |
+| S6 | Planned | Multi-tab, splits, tool redirection |
+| S7 | Planned | Memory plugin + project context |
+| S8 | Planned | Hardening, telemetry, packaging |
 
 Detailed task briefs are in `for_dev/planning/S{sprint}_{part}_{slug}.md`.
+
+## After each sprint — mandatory checklist
+
+These actions are **required** after completing every sprint:
+
+1. **Update `README.md`** — use the `readme-updater` skill. Add new sections for major features (plugin system, IPC, terminal, agent, etc.). Keep cross-platform instructions (bash + PowerShell).
+2. **Update test list in README** — list all tests by name in the Testing section with crate and description.
+3. **Update `for_dev/roadmap.md`** — mark exit criteria as checked.
+4. **Update `for_dev/planning/S*` files** — mark checklist items as done.
+5. **Update `CLAUDE.md`** (this file) — keep "Current status" and "Sprint plan" table accurate.
+6. **Regenerate `bindings.ts`** if IPC types changed — `cargo run -p rustacle-app --bin export_bindings`.
+7. **Run full check** — `cargo clippy --workspace -- -D warnings && cargo test --workspace && cargo fmt --all -- --check`.
 
 ## Review checklist
 
@@ -97,6 +117,7 @@ Detailed task briefs are in `for_dev/planning/S{sprint}_{part}_{slug}.md`.
 - New capabilities wired through `PermissionBroker`
 - New `pub` items in `rustacle-plugin-api` have doc comments
 - CI green: tests, clippy, fmt, deny, bindings regen
+- README updated with new features and tests
 
 ## References
 
