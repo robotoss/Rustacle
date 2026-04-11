@@ -1,22 +1,26 @@
 use std::io::{Read, Write};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 use portable_pty::{Child, CommandBuilder, MasterPty, NativePtySystem, PtySize, PtySystem};
 use rustacle_plugin_api::ModuleError;
 
 /// A single PTY session (one tab = one session).
 ///
-/// Uses `Mutex` wrappers because `MasterPty` and `Read` are not `Sync`,
-/// but `RustacleModule` requires `Send + Sync`.
+/// A background thread reads PTY output into a shared buffer.
+/// `read()` drains the buffer instantly — never blocks the caller.
 pub struct PtySession {
     master: Mutex<Box<dyn MasterPty + Send>>,
     writer: Mutex<Box<dyn Write + Send>>,
     child: Mutex<Box<dyn Child + Send + Sync>>,
-    reader: Mutex<Box<dyn Read + Send>>,
+    /// Output buffer filled by the background reader thread.
+    output_buf: Arc<Mutex<Vec<u8>>>,
 }
 
 impl PtySession {
     /// Spawn a new PTY session with the user's default shell.
+    ///
+    /// Starts a background thread that reads PTY output into a buffer.
     ///
     /// # Errors
     /// Returns `ModuleError::Internal` if shell detection or PTY creation fails.
@@ -44,7 +48,7 @@ impl PtySession {
             .spawn_command(cmd)
             .map_err(|e| ModuleError::Internal(format!("failed to spawn shell '{shell}': {e}")))?;
 
-        let reader = pair
+        let mut reader = pair
             .master
             .try_clone_reader()
             .map_err(|e| ModuleError::Internal(format!("failed to clone PTY reader: {e}")))?;
@@ -56,11 +60,32 @@ impl PtySession {
 
         tracing::info!(shell = %shell, cols, rows, "PTY session spawned");
 
+        // Background reader thread: reads PTY output into shared buffer.
+        let output_buf = Arc::new(Mutex::new(Vec::with_capacity(8192)));
+        let buf_clone = Arc::clone(&output_buf);
+
+        thread::Builder::new()
+            .name("pty-reader".to_string())
+            .spawn(move || {
+                let mut tmp = [0u8; 4096];
+                loop {
+                    match reader.read(&mut tmp) {
+                        Ok(n) if n > 0 => {
+                            if let Ok(mut buf) = buf_clone.lock() {
+                                buf.extend_from_slice(&tmp[..n]);
+                            }
+                        }
+                        _ => break, // EOF or error
+                    }
+                }
+            })
+            .map_err(|e| ModuleError::Internal(format!("failed to spawn reader thread: {e}")))?;
+
         Ok(Self {
             master: Mutex::new(pair.master),
             writer: Mutex::new(writer),
             child: Mutex::new(child),
-            reader: Mutex::new(reader),
+            output_buf,
         })
     }
 
@@ -72,32 +97,25 @@ impl PtySession {
     /// # Panics
     /// Panics if the PTY writer mutex is poisoned.
     pub fn write(&self, data: &[u8]) -> Result<(), ModuleError> {
-        // INVARIANT: lock never poisoned in normal operation
         let mut writer = self.writer.lock().expect("PTY writer lock poisoned");
         writer
             .write_all(data)
             .map_err(|e| ModuleError::Internal(format!("PTY write failed: {e}")))
     }
 
-    /// Read available output from the PTY.
-    ///
-    /// # Errors
-    /// Returns `ModuleError::Internal` on read failure.
+    /// Drain buffered output from the PTY. Returns immediately (non-blocking).
     ///
     /// # Panics
-    /// Panics if the PTY reader mutex is poisoned.
-    pub fn read(&self) -> Result<Vec<u8>, ModuleError> {
-        let mut reader = self.reader.lock().expect("PTY reader lock poisoned");
-        let mut buf = vec![0u8; 4096];
-        match reader.read(&mut buf) {
-            Ok(0) => Ok(vec![]),
-            Ok(n) => {
-                buf.truncate(n);
-                Ok(buf)
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(vec![]),
-            Err(e) => Err(ModuleError::Internal(format!("PTY read failed: {e}"))),
+    /// Panics if the output buffer mutex is poisoned.
+    #[must_use]
+    pub fn read(&self) -> Vec<u8> {
+        let mut buf = self.output_buf.lock().expect("output buffer lock poisoned");
+        if buf.is_empty() {
+            return Vec::new();
         }
+        let data = buf.clone();
+        buf.clear();
+        data
     }
 
     /// Resize the PTY.
@@ -169,5 +187,28 @@ mod tests {
     fn pty_spawn_and_alive() {
         let session = PtySession::spawn(None, 80, 24).expect("PTY should spawn");
         assert!(session.is_alive(), "child should be alive after spawn");
+    }
+
+    #[test]
+    fn pty_write_and_read() {
+        let session = PtySession::spawn(None, 80, 24).expect("PTY should spawn");
+
+        // Give shell time to start
+        std::thread::sleep(std::time::Duration::from_millis(500));
+
+        // Shell should have produced some output (prompt)
+        let output = session.read();
+        // Output may or may not be ready — just verify no panic
+        assert!(output.len() >= 0); // always true, just exercises the path
+
+        // Write and verify no error
+        session.write(b"echo hello\r\n").expect("write should work");
+
+        // Wait for response
+        std::thread::sleep(std::time::Duration::from_millis(500));
+
+        let output = session.read();
+        // Should have captured some output from echo
+        assert!(!output.is_empty(), "should have output after echo command");
     }
 }

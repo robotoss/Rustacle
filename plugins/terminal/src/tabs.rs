@@ -67,13 +67,13 @@ impl TabManager {
         tab.session.write(data)
     }
 
-    /// Read available output from a tab's PTY.
+    /// Read buffered output from a tab's PTY (non-blocking).
     ///
     /// # Errors
-    /// Returns `ModuleError` if the tab doesn't exist or read fails.
+    /// Returns `ModuleError` if the tab doesn't exist.
     pub fn read(&mut self, tab_id: &str) -> Result<Vec<u8>, ModuleError> {
         let tab = self.get_tab_mut(tab_id)?;
-        tab.session.read()
+        Ok(tab.session.read())
     }
 
     /// Resize a tab's PTY.
