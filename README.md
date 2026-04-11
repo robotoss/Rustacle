@@ -126,7 +126,7 @@ rustacle/
 │   ├── rustacle-plugin-api/      # RustacleModule trait, Capability, Manifest
 │   ├── rustacle-plugin-wit/      # WIT contract (rustacle:plugin@0.1.0)
 │   ├── rustacle-wasm-host/       # Wasmtime: loader, linker, fuel/memory limits
-│   ├── rustacle-settings/        # Zero-JSON settings store
+│   ├── rustacle-settings/        # SQLite settings store + keyring secrets
 │   ├── rustacle-llm/             # LLM provider abstraction
 │   ├── rustacle-llm-openai/      # OpenAI-compatible provider
 │   ├── rustacle-llm-anthropic/   # Anthropic provider
@@ -228,7 +228,7 @@ $env:RUSTACLE_LOG="debug"; cargo run -p rustacle-app
 | Property | proptest | Path canonicalization, backpressure |
 | E2E | Playwright | Full Tauri app UI flows |
 
-**Current tests (48):**
+**Current tests (54):**
 
 | Crate | Test | What it verifies |
 |-------|------|-----------------|
@@ -280,6 +280,22 @@ $env:RUSTACLE_LOG="debug"; cargo run -p rustacle-app
 | `rustacle-agent` | `dispatch_registered_tool` | Registered tool dispatches correctly |
 | `rustacle-agent` | `dispatch_unknown_tool_uses_placeholder` | Unknown tool uses placeholder |
 | `rustacle-agent` | `names_sorted` | Tool dispatch table names are sorted |
+| `rustacle-settings` | `get_returns_default_when_unset` | Unset keys return documented defaults |
+| `rustacle-settings` | `set_and_get_roundtrip` | Set + get produces same value |
+| `rustacle-settings` | `set_overwrites_previous` | Overwrite persists latest value |
+| `rustacle-settings` | `batch_set_all_or_nothing` | Batch updates are transactional |
+| `rustacle-settings` | `change_notification_fires` | Change events emitted on update |
+| `rustacle-settings` | `list_all_returns_all_keys` | All known keys listed |
+| `rustacle-settings` | `get_json_returns_default` | JSON default for numeric keys |
+| `rustacle-settings` | `persistent_store` | Survives close + reopen |
+| `rustacle-settings` | `secret_string_debug_redacts` | SecretString Debug shows *** |
+| `rustacle-settings` | `secret_string_display_redacts` | SecretString Display shows *** |
+| `rustacle-settings` | `secret_string_expose_returns_value` | expose() returns actual value |
+| `rustacle-settings` | `secret_string_is_empty` | Empty check works |
+| `rustacle-settings` | `keyring_store_not_found` | Missing key returns error |
+| `rustacle-settings` | `export_import_roundtrip` | Export → import preserves data |
+| `rustacle-settings` | `invalid_schema_version_rejected` | Bad version rejected |
+| `rustacle-settings` | `export_excludes_no_secrets` | No secret keys in export |
 
 ```bash
 cargo nextest run --workspace
@@ -295,8 +311,8 @@ cargo test -p rustacle-kernel -- permission
 | S2 — Plugin System | Done | WASM plugin system + FS plugin + demo integration |
 | S3 — Terminal | Done | PTY-backed terminal tabs + xterm.js UI |
 | S4 — Agent | Done | Visible reasoning + LLM providers |
-| S5 — Settings | Next | Zero-JSON settings UI |
-| S6 — Multi-tab | Planned | Splits, tool redirection |
+| S5 — Settings | Done | Zero-JSON settings UI + secrets/keyring |
+| S6 — Multi-tab | Next | Splits, tool redirection |
 | S7 — Memory | Planned | Long-term memory + project context |
 | S8 — Shipping | Planned | Hardening, telemetry, packaging |
 

@@ -4,8 +4,9 @@ import PingButton from "./components/common/PingButton";
 import PluginDemo from "./components/common/PluginDemo";
 import TerminalTab from "./components/terminal/Tab";
 import AgentPanel from "./components/agent/AgentPanel";
+import SettingsPage from "./components/settings/SettingsPage";
 
-type View = "home" | "terminal";
+type View = "home" | "terminal" | "settings";
 
 export default function App() {
   const [appVersion, setAppVersion] = useState("");
@@ -40,6 +41,16 @@ export default function App() {
         >
           Terminal
         </button>
+        <button
+          onClick={() => setView("settings")}
+          className={`px-3 py-1 rounded text-sm transition-colors ${
+            view === "settings"
+              ? "bg-indigo-700 text-white"
+              : "text-gray-400 hover:text-white"
+          }`}
+        >
+          Settings
+        </button>
         <span className="ml-auto text-xs text-gray-500">
           {appVersion ? `v${appVersion}` : ""}
         </span>
@@ -58,6 +69,7 @@ export default function App() {
           </div>
         )}
         {view === "terminal" && <TerminalTab />}
+        {view === "settings" && <SettingsPage />}
       </main>
 
       {/* Agent reasoning panel (Ctrl+J to toggle) */}

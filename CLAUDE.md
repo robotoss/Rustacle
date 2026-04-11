@@ -6,7 +6,7 @@ Rustacle is a local-first **desktop agent controller** (not a terminal emulator)
 
 ## Current status
 
-**Sprint 4 complete.** Full stack: workspace, Tauri shell, kernel (registry, permissions, real event bus with backpressure), type-safe IPC, WASM plugin system (WIT + wasmtime + Ed25519), FS plugin (Rust WASM), hello-js plugin (JavaScript WASM), demo plugin (native), terminal plugin with PTY (portable-pty), xterm.js UI with WebGL, LLM provider trait with OpenAI streaming + local server discovery, deterministic 8-layer prompt assembly with insta golden tests, ReAct harness loop with cancel tokens and budget guardrails, tool dispatch table with 7 stock tools, agent panel UI with reasoning cards. 48 tests. Next: **Sprint 5** (Zero-JSON Settings UI).
+**Sprint 5 complete.** Full stack through settings: kernel, IPC, WASM plugins, FS plugin, terminal (PTY + xterm.js), LLM providers, agent (prompt assembly, harness, tool dispatch, panel UI), SQLite-backed settings store with typed get/set, change notifications, batch transactions, SecretString with Debug redaction + memory zeroing, keyring store API, settings import/export with diff preview, Settings UI pages (ModelProfiles, Permissions, Keybindings, Themes, Import/Export). 54 tests. Next: **Sprint 6** (Multi-tab, splits, tool redirection).
 
 ## Architecture overview
 
@@ -87,8 +87,8 @@ Rustacle is a local-first **desktop agent controller** (not a terminal emulator)
 | S2 | Done | Plugin API + WASM plugin system + FS plugin + demo integration |
 | S3 | Done | Terminal plugin (PTY + xterm.js) + real event bus |
 | S4 | Done | Agent plugin v1 (LLM, harness, visible reasoning) |
-| S5 | Next | Zero-JSON Settings UI + secrets/keyring |
-| S6 | Planned | Multi-tab, splits, tool redirection |
+| S5 | Done | Zero-JSON Settings UI + secrets/keyring |
+| S6 | Next | Multi-tab, splits, tool redirection |
 | S7 | Planned | Memory plugin + project context |
 | S8 | Planned | Hardening, telemetry, packaging |
 
