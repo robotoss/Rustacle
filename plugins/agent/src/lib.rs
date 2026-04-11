@@ -1,1 +1,1 @@
-// rustacle-plugin-agent
+// rustacle-plugin-agent — WASM plugin stub

@@ -11,8 +11,13 @@ members = [
     "crates/rustacle-llm-anthropic",
     "crates/rustacle-llm-local",
     "crates/rustacle-app",
-    "plugins/fs",
     "plugins/terminal",
+]
+# WASM plugins (fs, chat, agent, memory, skills) are built separately
+# via cargo-component with target wasm32-wasip1.
+# They are NOT workspace members.
+exclude = [
+    "plugins/fs",
     "plugins/chat",
     "plugins/agent",
     "plugins/memory",

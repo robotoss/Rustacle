@@ -1,0 +1,8 @@
+# Trusted Ed25519 public keys for plugin signature verification.
+# Each entry maps a key name to its public key file path.
+# In production, these are distributed with the app bundle.
+
+[[keys]]
+name = "dev"
+description = "Local development signing key"
+public_key_file = "keys/dev_signing_key.pub.pem"

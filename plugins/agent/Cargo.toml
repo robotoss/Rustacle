@@ -1,12 +1,22 @@
 [package]
 name = "rustacle-plugin-agent"
 version = "0.1.0"
-edition.workspace = true
-rust-version.workspace = true
-license.workspace = true
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
 
-[lints]
-workspace = true
+[lib]
+crate-type = ["cdylib"]
 
 [dependencies]
-rustacle-plugin-api = { path = "../../crates/rustacle-plugin-api", version = "0.1.0" }
+wit-bindgen = "0.36"
+
+[package.metadata.component]
+package = "rustacle:plugin"
+
+[package.metadata.component.target]
+path = "../../crates/rustacle-plugin-wit/wit"
+world = "plugin"
+
+[lints.clippy]
+all = "warn"

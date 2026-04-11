@@ -1,1 +1,1 @@
-// rustacle-plugin-skills
+// rustacle-plugin-skills — WASM plugin stub

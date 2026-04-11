@@ -1,1 +1,1 @@
-// rustacle-plugin-memory
+// rustacle-plugin-memory — WASM plugin stub

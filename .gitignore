@@ -5,6 +5,9 @@ refs/
 /target/
 Cargo.lock
 
+# Generated WASM bindings (cargo-component generates these)
+plugins/*/src/bindings.rs
+
 # Node
 node_modules/
 ui/dist/

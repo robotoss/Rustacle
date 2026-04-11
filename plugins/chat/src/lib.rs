@@ -1,1 +1,1 @@
-// rustacle-plugin-chat
+// rustacle-plugin-chat — WASM plugin stub
