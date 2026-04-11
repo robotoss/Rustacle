@@ -20,6 +20,7 @@ tauri-build = { version = "2", features = [] }
 rustacle-kernel = { path = "../rustacle-kernel", version = "0.1.0" }
 rustacle-ipc = { path = "../rustacle-ipc", version = "0.1.0" }
 rustacle-plugin-api = { path = "../rustacle-plugin-api", version = "0.1.0" }
+rustacle-plugin-terminal = { path = "../../plugins/terminal" }
 tauri = { version = "2", features = [] }
 tauri-specta = { version = "=2.0.0-rc.24", features = ["derive", "typescript"] }
 specta = { version = "=2.0.0-rc.24", features = ["derive"] }

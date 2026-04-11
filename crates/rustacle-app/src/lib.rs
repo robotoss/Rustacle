@@ -10,6 +10,7 @@ use rustacle_ipc::errors::RustacleError;
 use rustacle_kernel::demo_plugin::DemoPlugin;
 use rustacle_kernel::{AppState, Kernel, PluginRegistry, lifecycle};
 use rustacle_plugin_api::RustacleModule;
+use rustacle_plugin_terminal::TerminalPlugin;
 
 /// Ping command — proves direct IPC round-trip works.
 #[allow(clippy::unnecessary_wraps)]
@@ -110,10 +111,14 @@ pub fn run() {
 
         let registry = PluginRegistry::new();
 
-        // Register the demo plugin to prove the pipeline.
+        // Register built-in plugins.
         let mut demo = DemoPlugin::new();
         demo.init().await.expect("demo plugin init failed");
         registry.register(Box::new(demo)).await;
+
+        let mut terminal = TerminalPlugin::new();
+        terminal.init().await.expect("terminal plugin init failed");
+        registry.register(Box::new(terminal)).await;
 
         (Arc::new(kernel), Arc::new(registry))
     });
