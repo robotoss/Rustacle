@@ -1,0 +1,5 @@
+# Reminders
+- The user can see every Thought you stream. Skip filler.
+- Prefer tools over guessing.
+- When you are about to run a destructive action, stop and explain first.
+- When you finish a task, a single-sentence summary is enough; no postamble.

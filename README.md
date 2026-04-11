@@ -131,6 +131,7 @@ rustacle/
 │   ├── rustacle-llm-openai/      # OpenAI-compatible provider
 │   ├── rustacle-llm-anthropic/   # Anthropic provider
 │   ├── rustacle-llm-local/       # Ollama / LM Studio provider
+│   ├── rustacle-agent/           # Agent prompt assembly + turn context
 │   └── rustacle-app/             # Tauri v2 binary + IPC commands
 ├── plugins/                      # Plugin crates (WASM + native)
 │   ├── fs/                       # File system plugin (WASM)
@@ -227,7 +228,7 @@ $env:RUSTACLE_LOG="debug"; cargo run -p rustacle-app
 | Property | proptest | Path canonicalization, backpressure |
 | E2E | Playwright | Full Tauri app UI flows |
 
-**Current tests (17):**
+**Current tests (37):**
 
 | Crate | Test | What it verifies |
 |-------|------|-----------------|
@@ -246,8 +247,28 @@ $env:RUSTACLE_LOG="debug"; cargo run -p rustacle-app
 | `rustacle-plugin-api` | `host_pattern_wildcard` | Wildcard `*.example.com` matching |
 | `rustacle-plugin-terminal` | `detect_shell_returns_something` | Shell auto-detection |
 | `rustacle-plugin-terminal` | `pty_spawn_and_alive` | PTY spawn and child alive |
+| `rustacle-plugin-terminal` | `pty_write_and_read` | PTY write/read round-trip |
 | `rustacle-wasm-host` | `js_plugin_component_is_valid` | JS WASM component loads via wasmtime |
 | `rustacle-wasm-host` | `rust_fs_plugin_component_is_valid` | Rust WASM component loads via wasmtime |
+| `rustacle-llm` | `token_cost_total` | Token cost arithmetic |
+| `rustacle-llm` | `chat_delta_serialization` | ChatDelta JSON round-trip |
+| `rustacle-llm` | `registry_profile_not_found` | Registry error on missing profile |
+| `rustacle-llm-openai` | `parse_text_delta` | SSE text delta parsing |
+| `rustacle-llm-openai` | `parse_done` | SSE done event parsing |
+| `rustacle-llm-openai` | `parse_usage` | SSE usage event parsing |
+| `rustacle-llm-openai` | `parse_tool_call_start` | SSE tool call start parsing |
+| `rustacle-llm-local` | `probes_list_is_not_empty` | Local server probe list populated |
+| `rustacle-agent` | `prompt_is_byte_identical_for_fixed_context` | Golden snapshot: deterministic prompt assembly |
+| `rustacle-agent` | `prompt_deterministic_across_calls` | Two calls with identical context produce identical output |
+| `rustacle-agent` | `changing_cwd_changes_only_env_layer` | Only env_context layer changes when cwd differs |
+| `rustacle-agent` | `tools_filtered_by_permission` | Tools without permission are excluded from prompt |
+| `rustacle-agent` | `empty_memory_omits_section` | Empty memory produces no memory section |
+| `rustacle-agent` | `format_date_epoch` | Unix epoch formats to 1970-01-01 |
+| `rustacle-agent` | `format_date_known` | Known timestamp formats correctly |
+| `rustacle-agent` | `truncate_within_budget` | Text within budget passes through unchanged |
+| `rustacle-agent` | `truncate_over_budget` | Over-budget text is truncated with marker |
+| `rustacle-agent` | `filters_by_permission` | Tool schemas filtered by permission grants |
+| `rustacle-agent` | `schemas_sorted_by_name` | Tool schemas sorted alphabetically for determinism |
 
 ```bash
 cargo nextest run --workspace
@@ -262,7 +283,7 @@ cargo test -p rustacle-kernel -- permission
 | S1 — IPC Bridge | Done | Type-safe IPC with Specta |
 | S2 — Plugin System | Done | WASM plugin system + FS plugin + demo integration |
 | S3 — Terminal | Done | PTY-backed terminal tabs + xterm.js UI |
-| S4 — Agent | Planned | Visible reasoning + LLM providers |
+| S4 — Agent | In Progress | Visible reasoning + LLM providers |
 | S5 — Settings | Planned | Zero-JSON settings UI |
 | S6 — Multi-tab | Planned | Splits, tool redirection |
 | S7 — Memory | Planned | Long-term memory + project context |
