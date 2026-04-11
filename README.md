@@ -99,8 +99,8 @@ cd ui; npm run build; cd ..
 cargo run -p rustacle-app
 ```
 
-> **Note:** The project has two binaries. If cargo asks which one to run, use:
-> `cargo run -p rustacle-app --bin rustacle-app`
+> **Important:** You must build the frontend (step 3) before running.
+> Without `ui/dist/`, the build will fail.
 
 ## Development
 
