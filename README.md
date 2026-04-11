@@ -7,7 +7,9 @@
 - **Visible Reasoning** — every Thought, ToolCall, and Answer streams as a typed event card in real time
 - **Zero-JSON Config** — every setting lives in a UI control, never a config file
 - **Micro-kernel Architecture** — small kernel (lifecycle, IPC, permissions, event bus) with plugin edges
-- **WASM Plugin Sandbox** — capability-gated, signed, hot-swappable modules
+- **WASM Plugin Sandbox** — capability-gated, Ed25519-signed, hot-swappable modules
+- **Type-safe IPC** — auto-generated TypeScript bindings from Rust types via tauri-specta
+- **Permission Broker** — every plugin capability is gated, cached, and user-controllable
 - **Multi-tab Terminal** — per-tab agent context with tool-use redirection
 - **Local + Cloud Models** — one trait, same UX for Ollama, LM Studio, OpenAI, Anthropic
 - **MCP Support** — external tools and resources gated by the same permission broker
@@ -19,8 +21,9 @@
 |-------|-----------|
 | Backend | Rust, Tauri v2, tokio, tracing |
 | Frontend | React 19, Vite, Tailwind CSS v4, TypeScript |
-| IPC | tauri-specta (typed, auto-generated bindings) |
-| Plugins | WebAssembly Component Model (wasmtime) |
+| IPC | tauri-specta (typed, auto-generated `bindings.ts`) |
+| Plugins | WebAssembly Component Model (wasmtime, WIT, cargo-component) |
+| Signing | Ed25519 (ed25519-dalek) |
 | State | Zustand (UI), SQLite (settings/history) |
 | Testing | nextest, insta, proptest, Playwright |
 
@@ -28,33 +31,87 @@
 
 ```
 rustacle/
-├── crates/                   # Host-side Rust crates
-│   ├── rustacle-kernel/      # Micro-kernel: lifecycle, bus, permissions
-│   ├── rustacle-ipc/         # Typed IPC commands and events
-│   ├── rustacle-plugin-api/  # Host-side plugin trait
-│   ├── rustacle-plugin-wit/  # WIT contract surface
-│   ├── rustacle-wasm-host/   # Wasmtime integration
-│   ├── rustacle-settings/    # Zero-JSON settings store
-│   ├── rustacle-llm/         # LLM provider abstraction
-│   ├── rustacle-llm-openai/  # OpenAI-compatible provider
-│   ├── rustacle-llm-anthropic/ # Anthropic provider
-│   ├── rustacle-llm-local/   # Ollama / LM Studio provider
-│   └── rustacle-app/         # Tauri v2 binary
-├── plugins/                  # Plugin crates (WASM + native)
-│   ├── fs/                   # File system (WASM)
-│   ├── terminal/             # PTY terminal (native)
-│   ├── chat/                 # Chat history (WASM)
-│   ├── agent/                # Agent reasoning loop (WASM)
-│   ├── memory/               # Long-term memory (WASM)
-│   └── skills/               # User-defined tools (WASM)
-├── ui/                       # React 19 + Vite + Tailwind CSS v4
-└── for_dev/                  # Architectural documentation
+├── crates/                       # Host-side Rust crates (workspace members)
+│   ├── rustacle-kernel/          # Micro-kernel: lifecycle, bus, permissions
+│   ├── rustacle-ipc/             # Typed IPC commands, events, RustacleError
+│   ├── rustacle-plugin-api/      # RustacleModule trait, Capability, Manifest
+│   ├── rustacle-plugin-wit/      # WIT contract (rustacle:plugin@0.1.0)
+│   ├── rustacle-wasm-host/       # Wasmtime: loader, linker, fuel/memory limits
+│   ├── rustacle-settings/        # Zero-JSON settings store (stub)
+│   ├── rustacle-llm/             # LLM provider abstraction (stub)
+│   ├── rustacle-llm-openai/      # OpenAI-compatible provider (stub)
+│   ├── rustacle-llm-anthropic/   # Anthropic provider (stub)
+│   ├── rustacle-llm-local/       # Ollama / LM Studio provider (stub)
+│   └── rustacle-app/             # Tauri v2 binary + IPC commands
+├── plugins/                      # Plugin crates
+│   ├── fs/                       # File system (WASM component)
+│   ├── terminal/                 # PTY terminal (native, workspace member)
+│   ├── chat/                     # Chat history (WASM stub)
+│   ├── agent/                    # Agent reasoning loop (WASM stub)
+│   ├── memory/                   # Long-term memory (WASM stub)
+│   └── skills/                   # User-defined tools (WASM stub)
+├── ui/                           # React 19 + Vite + Tailwind CSS v4
+│   ├── bindings.ts               # Auto-generated from Rust (DO NOT EDIT)
+│   └── src/                      # Components, App.tsx
+├── keys/                         # Trusted Ed25519 public keys for plugin signing
+├── scripts/                      # Dev scripts
+└── for_dev/                      # Architectural documentation (canon)
+```
+
+## Plugin System
+
+Rustacle uses a **WASM Component Model** plugin architecture. Every feature (chat, agent, FS, memory) is a plugin compiled to `.wasm` and loaded by the host at runtime.
+
+### How plugins work
+
+1. **Contract** — plugins implement a WIT interface defined in `crates/rustacle-plugin-wit/wit/rustacle.wit`
+2. **Host functions** — the host provides `fs-read`, `fs-write`, `net-fetch`, `secret-get`, `llm-stream`, `publish`, `log` to plugins
+3. **Capabilities** — each plugin declares required capabilities (Fs, Net, Pty, Secret, LlmProvider) in its manifest
+4. **Permission Broker** — every capability use is checked against user grants via `PermissionBroker`
+5. **Signing** — all `.wasm` files must be Ed25519-signed; unsigned plugins are refused at load time
+
+### Building WASM plugins
+
+```bash
+# Prerequisites
+rustup target add wasm32-wasip1
+cargo install cargo-component
+
+# Build a single plugin
+cd plugins/fs && cargo component build
+
+# Build all WASM plugins
+bash scripts/build-plugins.sh
+
+# Sign a plugin
+bash scripts/sign-plugin.sh target/wasm32-wasip1/debug/rustacle_plugin_fs.wasm
+```
+
+### Native plugins
+
+`plugins/terminal` is a native plugin (PTY spawning requires OS-level APIs that WASI cannot yet express). It implements `RustacleModule` directly and is compiled as part of the workspace.
+
+## IPC & Type Safety
+
+All communication between Rust and the UI goes through typed IPC commands generated by `tauri-specta`:
+
+- Rust types in `rustacle-ipc` are the single source of truth
+- `ui/bindings.ts` is auto-generated — never hand-edit it
+- `RustacleError` is exhaustively matched in TypeScript (no `default` branch)
+- CI enforces that `bindings.ts` stays in sync with Rust types
+
+```bash
+# Regenerate bindings after changing IPC types
+bash scripts/regen-bindings.sh            # macOS / Linux
+cargo run -p rustacle-app --bin export_bindings  # any OS
 ```
 
 ## Prerequisites
 
 - **Rust** stable (1.85+)
 - **Node.js** 22+
+- **cargo-component** (for WASM plugins): `cargo install cargo-component`
+- **wasm32-wasip1 target**: `rustup target add wasm32-wasip1`
 - **Platform dependencies**:
   - **Windows**: Visual Studio Build Tools (MSVC)
   - **macOS**: Xcode Command Line Tools
@@ -117,6 +174,9 @@ cargo nextest run --workspace
 # Regenerate TypeScript bindings after changing Rust IPC types
 bash scripts/regen-bindings.sh
 
+# Build WASM plugins
+bash scripts/build-plugins.sh
+
 # Run with debug logging
 RUSTACLE_LOG=debug cargo run -p rustacle-app
 ```
@@ -135,18 +195,54 @@ cargo nextest run --workspace
 # Regenerate TypeScript bindings
 cargo run -p rustacle-app --bin export_bindings
 
+# Build WASM plugins
+cd plugins/fs; cargo component build; cd ../..
+
 # Run with debug logging
 $env:RUSTACLE_LOG="debug"; cargo run -p rustacle-app
+```
+
+## Testing
+
+The project uses multiple test layers:
+
+| Layer | Tool | What it covers |
+|-------|------|----------------|
+| Unit | `cargo test` | Pure functions, permission logic, path scoping |
+| Integration | nextest | Kernel + single plugin harness |
+| Golden | insta | Prompt assembly snapshots (Sprint 4+) |
+| Property | proptest | Path canonicalization, backpressure (Sprint 3+) |
+| E2E | Playwright | Full Tauri app UI flows (Sprint 8) |
+
+**Current tests (7):**
+- `kernel::tests::kernel_start_stop` — kernel lifecycle
+- `capability::tests::path_scope_contains` — FS path scope matching
+- `capability::tests::host_pattern_exact` — exact host matching
+- `capability::tests::host_pattern_wildcard` — wildcard host matching
+- `permission::tests::permission_allow_is_cached` — grant caching
+- `permission::tests::permission_deny_is_not_cached` — deny not cached
+- `permission::tests::invalidate_removes_grant` — cache invalidation
+
+```bash
+# Run all tests
+cargo nextest run --workspace
+
+# Run specific test
+cargo test -p rustacle-kernel -- permission
+
+# Run with output
+cargo test -p rustacle-plugin-api -- --nocapture
 ```
 
 ## Architecture
 
 See [`for_dev/`](./for_dev/) for the full architectural documentation:
 
-- [Concept & Vision](./for_dev/concept.md)
-- [Architecture](./for_dev/architecture.md)
-- [Roadmap](./for_dev/roadmap.md)
-- [Knowledge Base](./for_dev/knowledge_base.md)
+- [Concept & Vision](./for_dev/concept.md) — what Rustacle is and why
+- [Architecture](./for_dev/architecture.md) — micro-kernel, WIT, plugin system, event bus
+- [Project Structure](./for_dev/project_structure.md) — every crate and file
+- [Roadmap](./for_dev/roadmap.md) — Sprint 0–8 plan with exit criteria
+- [Knowledge Base](./for_dev/knowledge_base.md) — Rust patterns, error handling, security
 
 ## Roadmap
 
@@ -155,7 +251,7 @@ See [`for_dev/`](./for_dev/) for the full architectural documentation:
 | S0 — Foundation | Done | Workspace, Tauri shell, kernel, CI |
 | S1 — IPC Bridge | Done | Type-safe IPC with Specta |
 | S2 — Plugin API | Done | WASM plugin system + FS plugin |
-| S3 — Terminal | Planned | PTY-backed terminal tabs |
+| S3 — Terminal | Next | PTY-backed terminal tabs |
 | S4 — Agent | Planned | Visible reasoning + LLM providers |
 | S5 — Settings | Planned | Zero-JSON settings UI |
 | S6 — Multi-tab | Planned | Splits, tool redirection |
