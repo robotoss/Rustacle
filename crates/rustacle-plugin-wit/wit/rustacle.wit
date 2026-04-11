@@ -1,1 +1,122 @@
-// WIT contract placeholder
+package rustacle:plugin@0.1.0;
+
+/// Shared types used by both host and guest.
+interface types {
+    /// Plugin identity and requirements declared at load time.
+    record module-manifest {
+        id: string,
+        version: string,
+        capabilities: list<capability>,
+        subscriptions: list<string>,
+        ui-contributions: ui-contributions,
+    }
+
+    /// A capability a plugin may request.
+    variant capability {
+        fs(fs-scope),
+        net(net-scope),
+        pty,
+        secret(string),
+        llm-provider,
+    }
+
+    /// Filesystem scope: paths and access mode.
+    record fs-scope {
+        paths: list<string>,
+        mode: fs-mode,
+    }
+
+    /// Read-only or read-write filesystem access.
+    enum fs-mode {
+        read,
+        read-write,
+    }
+
+    /// Network scope: allowed hosts.
+    record net-scope {
+        hosts: list<string>,
+    }
+
+    /// UI surfaces contributed by a plugin.
+    record ui-contributions {
+        panels: list<panel-desc>,
+        palette-entries: list<palette-entry>,
+        settings-schema: string,
+    }
+
+    /// A UI panel description.
+    record panel-desc {
+        id: string,
+        title: string,
+        icon: string,
+    }
+
+    /// A command palette entry.
+    record palette-entry {
+        id: string,
+        label: string,
+        shortcut: string,
+    }
+
+    /// Errors returned by plugin operations.
+    variant module-error {
+        denied(string),
+        invalid-input(string),
+        internal(string),
+    }
+}
+
+/// Exported by the plugin (guest).
+interface module {
+    use types.{module-manifest, module-error};
+
+    /// Return the plugin's manifest.
+    manifest: func() -> module-manifest;
+
+    /// Initialize the plugin after capability negotiation.
+    init: func() -> result<_, module-error>;
+
+    /// Handle an event from the event bus.
+    on-event: func(topic: string, payload: list<u8>) -> result<_, module-error>;
+
+    /// Shut down the plugin gracefully.
+    shutdown: func() -> result<_, module-error>;
+
+    /// RPC: invoke a plugin command by name.
+    call: func(command: string, payload: list<u8>) -> result<list<u8>, module-error>;
+}
+
+/// Imported by the plugin (provided by the host).
+interface host {
+    use types.{module-error};
+
+    /// Publish an event to the event bus.
+    publish: func(topic: string, payload: list<u8>);
+
+    /// Read a file (permission-gated).
+    fs-read: func(path: string) -> result<list<u8>, module-error>;
+
+    /// Write a file (permission-gated).
+    fs-write: func(path: string, data: list<u8>) -> result<_, module-error>;
+
+    /// HTTP fetch (permission-gated).
+    net-fetch: func(url: string, body: list<u8>) -> result<list<u8>, module-error>;
+
+    /// Retrieve a secret by key (permission-gated).
+    secret-get: func(key: string) -> result<string, module-error>;
+
+    /// Start an LLM streaming request. Returns a stream ID.
+    llm-stream: func(req: list<u8>) -> result<u64, module-error>;
+
+    /// Poll an LLM stream for the next chunk.
+    llm-poll: func(stream-id: u64) -> result<list<u8>, module-error>;
+
+    /// Structured logging.
+    log: func(level: string, message: string, fields: list<u8>);
+}
+
+/// The plugin world: exports module, imports host.
+world plugin {
+    import host;
+    export module;
+}
