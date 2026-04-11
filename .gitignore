@@ -1,2 +1,19 @@
 refs/
 .claude/settings.local.json
+
+# Rust
+/target/
+Cargo.lock
+
+# Node
+node_modules/
+ui/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
