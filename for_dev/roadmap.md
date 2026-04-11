@@ -20,11 +20,11 @@ Philosophy borrowed from `refs/claw-code/PARITY.md` — explicit checkpoint, enu
 - `for_dev/adr/0002-foundation-freeze.md` created at sprint end, freezing the directory layout.
 
 ### Exit criteria
-- [ ] `cargo run -p rustacle-app` opens a window on all three OSes.
-- [ ] `cargo nextest run --workspace` passes with ≥ 1 smoke test.
-- [ ] CI matrix green.
-- [ ] ADR-0001 ratified.
-- [ ] `kernel::start` logs lifecycle via `tracing` with span fields.
+- [x] `cargo run -p rustacle-app` opens a window on all three OSes.
+- [x] `cargo nextest run --workspace` passes with ≥ 1 smoke test.
+- [x] CI matrix green.
+- [x] ADR-0001 ratified.
+- [x] `kernel::start` logs lifecycle via `tracing` with span fields.
 
 ### Risks
 - Tauri v2 platform quirks on Windows (sandbox, WebView2). Mitigate by keeping a Windows-dev loop from day 1.

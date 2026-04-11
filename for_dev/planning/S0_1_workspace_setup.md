@@ -63,17 +63,17 @@ assets/           # empty
 ```
 
 ## Checklist
-- [ ] Root `Cargo.toml` is a workspace with all crates in members.
-- [ ] Each crate has a `Cargo.toml` with correct `name`, `edition = "2024"`.
-- [ ] `rust-toolchain.toml` is present.
-- [ ] `cargo check --workspace` passes.
-- [ ] `cargo fmt --all -- --check` passes.
-- [ ] `cargo clippy --workspace -- -D warnings` passes.
-- [ ] Inter-crate dependencies are declared as path dependencies (no versions yet).
-- [ ] `rustacle-app` depends on `rustacle-kernel`, `rustacle-ipc`.
-- [ ] `rustacle-kernel` depends on `rustacle-plugin-api`.
-- [ ] Plugin crates depend on `rustacle-plugin-api` (empty dependency for now).
-- [ ] No crate contains logic — stubs only.
+- [x] Root `Cargo.toml` is a workspace with all crates in members.
+- [x] Each crate has a `Cargo.toml` with correct `name`, `edition = "2024"`.
+- [x] `rust-toolchain.toml` is present. *(Removed later in S0.2 — MSVC default toolchain used instead)*
+- [x] `cargo check --workspace` passes.
+- [x] `cargo fmt --all -- --check` passes.
+- [x] `cargo clippy --workspace -- -D warnings` passes.
+- [x] Inter-crate dependencies are declared as path dependencies (no versions yet).
+- [x] `rustacle-app` depends on `rustacle-kernel`, `rustacle-ipc`.
+- [x] `rustacle-kernel` depends on `rustacle-plugin-api`.
+- [x] Plugin crates depend on `rustacle-plugin-api` (empty dependency for now).
+- [x] No crate contains logic — stubs only.
 
 ## Acceptance criteria
 ```bash

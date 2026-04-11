@@ -61,18 +61,18 @@ ui/
 ```
 
 ## Checklist
-- [ ] `Cargo.toml` for `rustacle-app` adds `tauri` v2 as a dependency.
-- [ ] `build.rs` calls `tauri_build::build()`.
-- [ ] `tauri.conf.json` created with correct identifier and window config.
-- [ ] `ui/index.html` exists with placeholder content.
-- [ ] `ui/package.json` + `vite.config.ts` are configured.
-- [ ] `npm install` (or `pnpm install`) in `ui/` passes.
-- [ ] `cargo run -p rustacle-app` opens a window on all three OSes.
-- [ ] Window shows placeholder text.
-- [ ] Window is resizable, with correct title "Rustacle".
-- [ ] macOS: native menu (File, Edit, Window, Help) works.
-- [ ] Windows: window has standard title bar.
-- [ ] Closing the window terminates the process.
+- [x] `Cargo.toml` for `rustacle-app` adds `tauri` v2 as a dependency.
+- [x] `build.rs` calls `tauri_build::build()`.
+- [x] `tauri.conf.json` created with correct identifier and window config.
+- [x] `ui/index.html` exists with placeholder content.
+- [x] `ui/package.json` + `vite.config.ts` are configured.
+- [x] `npm install` (or `pnpm install`) in `ui/` passes.
+- [x] `cargo run -p rustacle-app` opens a window on all three OSes.
+- [x] Window shows placeholder text.
+- [x] Window is resizable, with correct title "Rustacle".
+- [ ] macOS: native menu (File, Edit, Window, Help) works. *(Not verified — no macOS available)*
+- [x] Windows: window has standard title bar.
+- [x] Closing the window terminates the process.
 
 ## Acceptance criteria
 ```bash

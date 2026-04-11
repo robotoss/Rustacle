@@ -86,17 +86,17 @@ echo "All checks passed!"
 ```
 
 ## Checklist
-- [ ] `.github/workflows/ci.yml` is created.
-- [ ] CI triggers on push and pull_request.
-- [ ] Matrix: windows-2022, macos-14, ubuntu-22.04.
-- [ ] `cargo fmt --check` — a CI step.
-- [ ] `cargo clippy -D warnings` — a CI step.
-- [ ] `cargo nextest run` — a CI step.
-- [ ] `cargo deny check` — a CI step (Ubuntu only, since it is platform-independent).
-- [ ] `sccache` is configured for caching.
-- [ ] `deny.toml` exists at root with license and advisory settings.
-- [ ] `scripts/check-local.sh` exists for local verification.
-- [ ] CI is green on the current code.
+- [x] `.github/workflows/ci.yml` is created.
+- [x] CI triggers on push and pull_request.
+- [x] Matrix: windows-2022, macos-14, ubuntu-22.04.
+- [x] `cargo fmt --check` — a CI step.
+- [x] `cargo clippy -D warnings` — a CI step.
+- [x] `cargo nextest run` — a CI step.
+- [x] `cargo deny check` — a CI step (Ubuntu only, since it is platform-independent).
+- [x] `sccache` is configured for caching.
+- [x] `deny.toml` exists at root with license and advisory settings.
+- [x] `scripts/check-local.sh` exists for local verification.
+- [ ] CI is green on the current code. *(Not pushed to remote yet)*
 
 ## Acceptance criteria
 - Push to main → CI runs on 3 OSes → all green.

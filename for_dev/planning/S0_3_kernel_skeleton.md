@@ -116,16 +116,16 @@ fn main() {
 ```
 
 ## Checklist
-- [ ] `Kernel::new()` creates an instance with `CancellationToken` and `JoinSet`.
-- [ ] `Kernel::start()` logs `info` "kernel starting" and "kernel started".
-- [ ] `Kernel::stop()` calls `shutdown.cancel()`, awaits JoinSet.
-- [ ] `AppState` is created and managed via Tauri.
-- [ ] `init_tracing()` configures `tracing-subscriber` with env filter.
-- [ ] `RUSTACLE_LOG=debug cargo run -p rustacle-app` shows debug-level output.
-- [ ] `KernelError` is defined with `thiserror`.
-- [ ] `Bus` stub exists (empty).
-- [ ] All spans use structured fields (no string interpolation).
-- [ ] `cargo test -p rustacle-kernel` — at least 1 test: `kernel_start_stop`.
+- [x] `Kernel::new()` creates an instance with `CancellationToken` and `JoinSet`.
+- [x] `Kernel::start()` logs `info` "kernel starting" and "kernel started".
+- [x] `Kernel::stop()` calls `shutdown.cancel()`, awaits JoinSet.
+- [x] `AppState` is created and managed via Tauri.
+- [x] `init_tracing()` configures `tracing-subscriber` with env filter.
+- [x] `RUSTACLE_LOG=debug cargo run -p rustacle-app` shows debug-level output.
+- [x] `KernelError` is defined with `thiserror`.
+- [x] `Bus` stub exists (empty).
+- [x] All spans use structured fields (no string interpolation).
+- [x] `cargo test -p rustacle-kernel` — at least 1 test: `kernel_start_stop`.
 
 ## Acceptance criteria
 ```bash

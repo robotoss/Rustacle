@@ -44,13 +44,13 @@ ui/
 - `for_dev/adr/0002-foundation-freeze.md` — new file documenting the frozen directory layout after Sprint 0.
 
 ## Checklist
-- [ ] Framework installed and listed in `ui/package.json`
-- [ ] `cd ui && npm run dev` starts Vite dev server without errors
-- [ ] `cd ui && npm run build` produces `ui/dist/` with bundled output
-- [ ] Tailwind CSS classes render correctly in the placeholder App component
-- [ ] `cargo run -p rustacle-app` launches the Tauri window showing the styled placeholder
-- [ ] ADR-0001 has "Accepted" status with documented trade-offs
-- [ ] ADR-0002 created with frozen directory tree
+- [x] Framework installed and listed in `ui/package.json`
+- [x] `cd ui && npm run dev` starts Vite dev server without errors
+- [x] `cd ui && npm run build` produces `ui/dist/` with bundled output
+- [x] Tailwind CSS classes render correctly in the placeholder App component
+- [x] `cargo run -p rustacle-app` launches the Tauri window showing the styled placeholder
+- [x] ADR-0001 has "Accepted" status with documented trade-offs
+- [x] ADR-0002 created with frozen directory tree
 
 ## Acceptance criteria
 ```bash
