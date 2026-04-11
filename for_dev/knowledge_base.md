@@ -357,7 +357,7 @@ TOCTOU: on Unix, prefer `openat` family via `rustix` so the scope check and open
 
 | Gotcha | Fix |
 |---|---|
-| `cargo-deny` v0.19+ changed `[advisories]` config format | Use scope values (`all`, `workspace`, `transitive`, `none`) instead of action keywords (`deny`, `warn`). Exception: `yanked` still uses actions. |
+| `cargo-deny` v0.16+ removed `[advisories]` per-field severity keys | Don't use `vulnerability`, `unmaintained`, `unsound` etc. Leave `[advisories]` minimal; use `ignore = [...]` for suppressions. See [PR #611](https://github.com/EmbarkStudios/cargo-deny/pull/611). |
 | PowerShell does not support `&&` operator | Use `;` to chain commands: `cd ui; npm install; cd ..` |
 | `cargo run -p rustacle-app` fails with "could not determine which binary" | Add `default-run = "rustacle-app"` to the `[package]` section |
 | Tauri `devUrl` causes ERR_CONNECTION_REFUSED on `cargo run` | Remove `devUrl`/`beforeDevCommand` from `tauri.conf.json`; use `frontendDist` only. Dev server is for `cargo tauri dev` only. |

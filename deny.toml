@@ -1,9 +1,6 @@
 [advisories]
-# Scope for vulnerability checking: all, workspace, transitive, none
-vulnerability = "all"
-unmaintained = "workspace"
-unsound = "all"
-yanked = "deny"
+# cargo-deny v0.16+ removed per-field severity keys.
+# Use `ignore` to suppress specific advisories if needed.
 
 [licenses]
 allow = [

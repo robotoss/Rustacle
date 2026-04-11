@@ -6,8 +6,7 @@ use tracing_subscriber::{EnvFilter, fmt::format::FmtSpan};
 pub fn init_tracing() {
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_env("RUSTACLE_LOG")
-                .unwrap_or_else(|_| EnvFilter::new("info")),
+            EnvFilter::try_from_env("RUSTACLE_LOG").unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .with_target(true)
         .with_span_events(FmtSpan::CLOSE)

@@ -58,16 +58,14 @@ jobs:
 
 ### `deny.toml` (project root)
 
-> **Note (cargo-deny v0.19+):** The `[advisories]` section uses scope values
-> (`all`, `workspace`, `transitive`, `none`) instead of action keywords
-> (`deny`, `warn`, `allow`). Exception: `yanked` still uses action keywords.
+> **Note (cargo-deny v0.16+):** The `[advisories]` section removed per-field
+> severity keys (`vulnerability`, `unmaintained`, `unsound`). The section is
+> now minimal — just `ignore = [...]` for suppressed advisories. See
+> [PR #611](https://github.com/EmbarkStudios/cargo-deny/pull/611).
 
 ```toml
 [advisories]
-vulnerability = "all"
-unmaintained = "workspace"
-unsound = "all"
-yanked = "deny"
+# Per-field severity keys removed in v0.16+. Use ignore = [...] if needed.
 
 [licenses]
 allow = ["MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-2-Clause", "BSD-3-Clause", "ISC", "Zlib", "Unicode-3.0", "Unicode-DFS-2016", "MPL-2.0"]

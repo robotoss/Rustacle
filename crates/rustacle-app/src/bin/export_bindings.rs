@@ -3,7 +3,8 @@
 fn main() {
     let builder = rustacle_app_lib::specta_builder();
 
-    let bindings_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ui/bindings.ts");
+    let bindings_path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ui/bindings.ts");
 
     builder
         .export(
