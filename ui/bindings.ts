@@ -17,13 +17,43 @@ export const commands = {
 	 *  This is the core integration proof: UI → IPC → Kernel → Plugin → back.
 	 */
 	pluginCall: (request: PluginCallRequest) => typedError<PluginCallResponse, RustacleError>(__TAURI_INVOKE("plugin_call", { request })),
+	/**
+	 *  Send a prompt to the agent, starting a new turn.
+	 * 
+	 *  Spawns the harness loop in the background and streams reasoning steps
+	 *  as Tauri events. Returns the turn ID immediately.
+	 */
+	sendPrompt: (request: SendPromptRequest) => typedError<SendPromptResponse, RustacleError>(__TAURI_INVOKE("send_prompt", { request })),
+	// Stop an active agent turn.
+	stopTurn: (request: StopTurnRequest) => typedError<StopTurnResponse, RustacleError>(__TAURI_INVOKE("stop_turn", { request })),
+	// List available model profiles from settings.
+	listModelProfiles: () => typedError<ListModelProfilesResponse, RustacleError>(__TAURI_INVOKE("list_model_profiles")),
+	// Respond to a permission request from the agent.
+	respondPermission: (request: RespondPermissionRequest) => typedError<null, RustacleError>(__TAURI_INVOKE("respond_permission", { request })),
 };
 
 /* Types */
+// Agent interaction mode.
+export type AgentMode = 
+// Full tools enabled, `ReAct` loop.
+"Chat" | 
+// Read-only tools only, planning overlay.
+"Plan" | 
+// No tools, direct Q&A.
+"Ask";
+
+// Response from `list_model_profiles`.
+export type ListModelProfilesResponse = {
+	profiles: ProfileSummary[],
+};
+
 // Response from `list_plugins`.
 export type ListPluginsResponse = {
 	plugins: PluginSummary[],
 };
+
+// Permission decision from the user.
+export type PermissionDecision = "Deny" | "AllowOnce" | "AllowAlways";
 
 // Response from the `ping` command.
 export type PingResponse = {
@@ -54,6 +84,20 @@ export type PluginSummary = {
 	state: PluginState,
 };
 
+// Summary of a model profile for the quick-switcher.
+export type ProfileSummary = {
+	name: string,
+	provider: string,
+	model: string,
+};
+
+// Input for `respond_permission`.
+export type RespondPermissionRequest = {
+	turn_id: string,
+	step_id: string,
+	decision: PermissionDecision,
+};
+
 /**
  *  Typed error enum for all IPC commands.
  *  Serialized as externally tagged JSON for exhaustive TS matching.
@@ -72,6 +116,28 @@ export type RustacleError = { kind: "NotFound"; data: {
 	plugin_id: string,
 	message: string,
 } };
+
+// Input for `send_prompt`.
+export type SendPromptRequest = {
+	message: string,
+	model_profile: string | null,
+	mode: AgentMode,
+};
+
+// Response from `send_prompt`.
+export type SendPromptResponse = {
+	turn_id: string,
+};
+
+// Input for `stop_turn`.
+export type StopTurnRequest = {
+	turn_id: string,
+};
+
+// Response from `stop_turn`.
+export type StopTurnResponse = {
+	cancelled: boolean,
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

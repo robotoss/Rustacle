@@ -98,6 +98,10 @@ pub fn assemble_prompt(ctx: &TurnContext) -> Prompt {
     let overlay = layers::render_model_overlay(&ctx.model_profile);
     p.push_system_section("model_profile", &overlay);
 
+    // 2.5. Mode overlay (Plan/Ask — empty for Chat)
+    let mode_overlay = layers::render_mode_overlay(ctx);
+    p.push_system_section("mode_overlay", &mode_overlay);
+
     // 3. Environment context
     let env = layers::render_env_context(ctx);
     p.push_system_section("env_context", &env);

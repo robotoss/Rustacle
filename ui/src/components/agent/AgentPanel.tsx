@@ -2,15 +2,58 @@
  * AgentPanel — collapsible side panel that streams reasoning steps as typed cards.
  *
  * Toggle with Ctrl/Cmd+J. Steps stream in real time via Tauri events.
+ * Includes chat input, mode selector, and profile switcher.
  */
 
 import { useCallback, useEffect, useReducer, useRef } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { commands } from "../../../bindings";
 import { agentReducer, initialAgentState } from "../../state/agent";
-import type { ReasoningStep, PermissionDecision } from "../../state/agent";
+import type { ReasoningStep, PermissionDecision, AgentMode } from "../../state/agent";
 import ThoughtCard from "./ThoughtCard";
 import ToolCallCard from "./ToolCallCard";
 import PermissionCard from "./PermissionCard";
 import CostBadge from "./CostBadge";
+import ChatInput from "./ChatInput";
+import ModeSelector from "./ModeSelector";
+import ProfileSwitcher from "./ProfileSwitcher";
+
+/** Map IPC event payload to local ReasoningStep shape. */
+function mapEventToStep(payload: {
+  id: string;
+  parent_id?: string;
+  turn_id: string;
+  ts_ms: number;
+  step: { type: string; data: Record<string, unknown> };
+}): ReasoningStep {
+  const { id, parent_id, turn_id, ts_ms, step: raw } = payload;
+
+  let step: ReasoningStep["step"];
+  switch (raw.type) {
+    case "Thought":
+      step = { kind: "Thought", data: { text: raw.data.text as string, partial: raw.data.partial as boolean } };
+      break;
+    case "ToolCall":
+      step = { kind: "ToolCall", data: { tool: raw.data.tool as string, args: raw.data.args, tab_target: raw.data.tab_target as number | undefined } };
+      break;
+    case "ToolResult":
+      step = { kind: "ToolResult", data: { tool: raw.data.tool as string, ok: raw.data.ok as boolean, summary: raw.data.summary as string, duration_ms: raw.data.duration_ms as number } };
+      break;
+    case "PermissionAsk":
+      step = { kind: "PermissionAsk", data: { capability: raw.data.capability as string, decision: raw.data.decision as PermissionDecision | undefined } };
+      break;
+    case "Answer":
+      step = { kind: "Answer", data: { text: raw.data.text as string } };
+      break;
+    case "Error":
+      step = { kind: "Error", data: { message: raw.data.message as string, retryable: raw.data.retryable as boolean } };
+      break;
+    default:
+      step = { kind: "Error", data: { message: `Unknown step type: ${raw.type}`, retryable: false } };
+  }
+
+  return { id, parent_id, turn_id, ts_ms, step };
+}
 
 export default function AgentPanel() {
   const [state, dispatch] = useReducer(agentReducer, initialAgentState);
@@ -33,23 +76,116 @@ export default function AgentPanel() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [state.steps.length]);
+  }, [state.turns]);
 
-  // TODO: Wire up Tauri event listener for agent.reasoning and agent.cost
-  // events.listen<ReasoningStep>("agent:reasoning", (event) => {
-  //   dispatch({ type: "ADD_STEP", step: event.payload });
-  // });
+  // Wire up Tauri event listeners
+  useEffect(() => {
+    const unlisteners: Promise<() => void>[] = [];
 
-  const handlePermissionDecide = useCallback(
-    (_stepId: string, _decision: PermissionDecision) => {
-      // TODO: Send permission decision back to Rust via Tauri command
+    unlisteners.push(
+      listen("agent:reasoning", (event) => {
+        const step = mapEventToStep(event.payload as Parameters<typeof mapEventToStep>[0]);
+        dispatch({ type: "ADD_STEP", step });
+      })
+    );
+
+    unlisteners.push(
+      listen("agent:cost", (event) => {
+        const payload = event.payload as { turn_id: string; input_tokens: number; output_tokens: number };
+        dispatch({ type: "UPDATE_COST", cost: payload });
+      })
+    );
+
+    unlisteners.push(
+      listen("agent:turn_end", (event) => {
+        const payload = event.payload as {
+          turn_id: string;
+          duration_ms: number;
+          input_tokens: number;
+          output_tokens: number;
+        };
+        dispatch({
+          type: "FINISH_TURN",
+          turnId: payload.turn_id,
+          duration_ms: payload.duration_ms,
+          input_tokens: payload.input_tokens,
+          output_tokens: payload.output_tokens,
+        });
+      })
+    );
+
+    return () => {
+      for (const p of unlisteners) {
+        p.then((f) => f());
+      }
+    };
+  }, []);
+
+  const handleSend = useCallback(
+    async (message: string) => {
+      const model = state.currentProfile ?? "default";
+      const mode = state.mode;
+
+      // Optimistically start the turn in UI with a temp ID
+      const tempTurnId = `pending-${Date.now()}`;
+      dispatch({
+        type: "START_TURN",
+        turnId: tempTurnId,
+        userMessage: message,
+        mode,
+        model,
+      });
+
+      try {
+        const result = await commands.sendPrompt({
+          message,
+          model_profile: state.currentProfile,
+          mode: mode as "Chat" | "Plan" | "Ask",
+        });
+
+        if (result.status === "ok") {
+          // Replace temp turn_id with the real one from backend
+          dispatch({
+            type: "REPLACE_TURN_ID",
+            oldId: tempTurnId,
+            newId: result.data.turn_id,
+          });
+        } else {
+          dispatch({ type: "END_TURN" });
+        }
+      } catch {
+        dispatch({ type: "END_TURN" });
+      }
     },
-    []
+    [state.currentProfile, state.mode]
   );
 
-  const handleStop = useCallback(() => {
-    // TODO: Send cancel command to Rust via Tauri command
-  }, []);
+  const handleStop = useCallback(async () => {
+    if (state.activeTurnId) {
+      try {
+        await commands.stopTurn({ turn_id: state.activeTurnId });
+      } catch {
+        // Best effort
+      }
+    }
+  }, [state.activeTurnId]);
+
+  const handlePermissionDecide = useCallback(
+    async (stepId: string, decision: PermissionDecision) => {
+      if (state.activeTurnId) {
+        try {
+          await commands.respondPermission({
+            turn_id: state.activeTurnId,
+            step_id: stepId,
+            decision,
+          });
+        } catch {
+          // Best effort
+        }
+      }
+    },
+    [state.activeTurnId]
+  );
 
   if (!state.panelOpen) {
     return (
@@ -70,45 +206,86 @@ export default function AgentPanel() {
       aria-label="Agent reasoning panel"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700">
-        <h2 className="text-sm font-semibold text-gray-300">Agent</h2>
-        <div className="flex items-center gap-2">
-          {state.activeTurnId && (
-            <button
-              onClick={handleStop}
-              className="px-2 py-0.5 text-xs rounded bg-red-800 hover:bg-red-700 text-white transition-colors"
-            >
-              Stop
-            </button>
-          )}
-          <button
-            onClick={() => dispatch({ type: "SET_PANEL", open: false })}
-            className="text-gray-500 hover:text-white text-lg leading-none"
-            title="Close (Ctrl+J)"
-          >
-            &times;
-          </button>
+      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700 gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <h2 className="text-sm font-semibold text-gray-300 shrink-0">Agent</h2>
+          <ModeSelector
+            mode={state.mode}
+            onChange={(mode: AgentMode) => dispatch({ type: "SET_MODE", mode })}
+            disabled={state.inputDisabled}
+          />
+          <ProfileSwitcher
+            currentProfile={state.currentProfile}
+            onChange={(profile: string) => dispatch({ type: "SET_PROFILE", profile })}
+          />
         </div>
+        <button
+          onClick={() => dispatch({ type: "SET_PANEL", open: false })}
+          className="text-gray-500 hover:text-white text-lg leading-none shrink-0"
+          title="Close (Ctrl+J)"
+        >
+          &times;
+        </button>
       </div>
 
       {/* Cost badge */}
       <CostBadge cost={state.cost} active={state.activeTurnId !== null} />
 
-      {/* Steps */}
+      {/* Conversation history */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-2 py-2 space-y-1"
+        className="flex-1 overflow-y-auto px-2 py-2 space-y-2"
         aria-live="polite"
         aria-atomic="false"
       >
-        {state.steps.length === 0 && (
+        {state.turns.length === 0 && (
           <p className="text-sm text-gray-600 text-center mt-8">
-            No reasoning steps yet. Start a conversation to see agent thinking.
+            No conversation yet. Type a message below to start.
           </p>
         )}
 
-        {state.steps.map((step) => renderStep(step, handlePermissionDecide))}
+        {state.turns.map((turn) => (
+          <div key={turn.turnId} className="space-y-1">
+            {/* User message bubble */}
+            <div className="flex justify-end">
+              <div className="max-w-[85%] bg-blue-900/40 border border-blue-800/50 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs text-blue-400 uppercase tracking-wide">{turn.mode}</span>
+                  {turn.tokenUsage && (
+                    <span className="text-xs text-gray-600">
+                      {turn.tokenUsage.input + turn.tokenUsage.output} tok
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-200 whitespace-pre-wrap">{turn.userMessage}</p>
+              </div>
+            </div>
+
+            {/* Reasoning steps */}
+            {turn.steps.map((step) => renderStep(step, handlePermissionDecide))}
+
+            {/* Turn separator */}
+            {turn.endedAt && (
+              <div className="flex items-center gap-2 py-1">
+                <div className="flex-1 border-t border-gray-800" />
+                <span className="text-xs text-gray-700">
+                  {new Date(turn.endedAt).toLocaleTimeString()}
+                </span>
+                <div className="flex-1 border-t border-gray-800" />
+              </div>
+            )}
+          </div>
+        ))}
       </div>
+
+      {/* Chat input */}
+      <ChatInput
+        disabled={state.inputDisabled}
+        activeModel={state.currentProfile}
+        onSend={handleSend}
+        onStop={handleStop}
+        isRunning={state.activeTurnId !== null}
+      />
     </div>
   );
 }

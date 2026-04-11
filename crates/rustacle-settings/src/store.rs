@@ -7,13 +7,13 @@ use std::path::Path;
 use std::sync::Arc;
 
 use rusqlite::{Connection, params};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use tokio::sync::broadcast;
 use tracing::{debug, info};
 
-use crate::schema::SettingKey;
 use crate::SettingsError;
+use crate::schema::SettingKey;
 
 /// Schema version for forward-compatible migrations.
 const SCHEMA_VERSION: u32 = 1;
@@ -37,8 +37,7 @@ impl SettingsStore {
     /// # Errors
     /// Returns `SettingsError` if the database cannot be opened or migrated.
     pub fn open(path: &Path) -> Result<Self, SettingsError> {
-        let conn = Connection::open(path)
-            .map_err(|e| SettingsError::Database(e.to_string()))?;
+        let conn = Connection::open(path).map_err(|e| SettingsError::Database(e.to_string()))?;
 
         // Run migrations
         Self::migrate(&conn)?;
@@ -58,8 +57,8 @@ impl SettingsStore {
     /// # Errors
     /// Returns `SettingsError` if the database cannot be created.
     pub fn open_memory() -> Result<Self, SettingsError> {
-        let conn = Connection::open_in_memory()
-            .map_err(|e| SettingsError::Database(e.to_string()))?;
+        let conn =
+            Connection::open_in_memory().map_err(|e| SettingsError::Database(e.to_string()))?;
 
         Self::migrate(&conn)?;
 
@@ -82,7 +81,7 @@ impl SettingsStore {
                 key TEXT PRIMARY KEY NOT NULL,
                 value TEXT NOT NULL,
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-            );"
+            );",
         )
         .map_err(|e| SettingsError::Database(format!("migration: {e}")))?;
 
@@ -110,7 +109,10 @@ impl SettingsStore {
     /// # Errors
     /// Returns `SettingsError` on database or deserialization errors.
     pub fn get<T: DeserializeOwned>(&self, key: SettingKey) -> Result<T, SettingsError> {
-        let conn = self.conn.lock().map_err(|e| SettingsError::Database(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SettingsError::Database(e.to_string()))?;
 
         let result: Option<String> = conn
             .query_row(
@@ -126,8 +128,7 @@ impl SettingsStore {
             None => key.default_json(),
         };
 
-        serde_json::from_value(json_value)
-            .map_err(|e| SettingsError::Serialization(e.to_string()))
+        serde_json::from_value(json_value).map_err(|e| SettingsError::Serialization(e.to_string()))
     }
 
     /// Get a raw JSON value for a setting.
@@ -135,7 +136,10 @@ impl SettingsStore {
     /// # Errors
     /// Returns `SettingsError` on database errors.
     pub fn get_json(&self, key: SettingKey) -> Result<serde_json::Value, SettingsError> {
-        let conn = self.conn.lock().map_err(|e| SettingsError::Database(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SettingsError::Database(e.to_string()))?;
 
         let result: Option<String> = conn
             .query_row(
@@ -146,8 +150,9 @@ impl SettingsStore {
             .ok();
 
         match result {
-            Some(raw) => serde_json::from_str(&raw)
-                .map_err(|e| SettingsError::Serialization(e.to_string())),
+            Some(raw) => {
+                serde_json::from_str(&raw).map_err(|e| SettingsError::Serialization(e.to_string()))
+            }
             None => Ok(key.default_json()),
         }
     }
@@ -157,8 +162,8 @@ impl SettingsStore {
     /// # Errors
     /// Returns `SettingsError` on database or serialization errors.
     pub fn set<T: Serialize>(&self, key: SettingKey, value: &T) -> Result<(), SettingsError> {
-        let json = serde_json::to_value(value)
-            .map_err(|e| SettingsError::Serialization(e.to_string()))?;
+        let json =
+            serde_json::to_value(value).map_err(|e| SettingsError::Serialization(e.to_string()))?;
         self.set_json(key, json)
     }
 
@@ -170,7 +175,10 @@ impl SettingsStore {
         let raw = serde_json::to_string(&value)
             .map_err(|e| SettingsError::Serialization(e.to_string()))?;
 
-        let conn = self.conn.lock().map_err(|e| SettingsError::Database(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SettingsError::Database(e.to_string()))?;
 
         conn.execute(
             "INSERT INTO settings (key, value, updated_at) VALUES (?1, ?2, datetime('now'))
@@ -198,7 +206,10 @@ impl SettingsStore {
         &self,
         updates: &[(SettingKey, serde_json::Value)],
     ) -> Result<(), SettingsError> {
-        let conn = self.conn.lock().map_err(|e| SettingsError::Database(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SettingsError::Database(e.to_string()))?;
 
         let tx = conn
             .unchecked_transaction()

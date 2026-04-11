@@ -61,18 +61,12 @@ impl Tool for GrepTool {
             .and_then(Value::as_str)
             .unwrap_or(".")
             .to_owned();
-        vec![Capability::Fs {
-            path,
-            write: false,
-        }]
+        vec![Capability::Fs { path, write: false }]
     }
 
     async fn call(&self, args: Value, ctx: ToolCtx) -> Result<ToolOutput, ToolError> {
         let pattern = args["pattern"].as_str().unwrap_or("");
-        let search_path = args
-            .get("path")
-            .and_then(Value::as_str)
-            .unwrap_or(".");
+        let search_path = args.get("path").and_then(Value::as_str).unwrap_or(".");
         let path = ctx.cwd.join(search_path);
 
         // Simple regex-based grep implementation
@@ -104,10 +98,7 @@ impl Tool for GrepTool {
 
                 // Apply glob filter
                 if let Some(glob_pat) = glob_filter {
-                    let name = entry
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("");
+                    let name = entry.file_name().and_then(|n| n.to_str()).unwrap_or("");
                     if !simple_glob_match(glob_pat, name) {
                         continue;
                     }
@@ -154,11 +145,7 @@ fn grep_file(
 }
 
 /// Recursively collect files up to a depth limit.
-async fn collect_files(
-    dir: &std::path::Path,
-    out: &mut Vec<std::path::PathBuf>,
-    max_depth: u32,
-) {
+async fn collect_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>, max_depth: u32) {
     if max_depth == 0 {
         return;
     }

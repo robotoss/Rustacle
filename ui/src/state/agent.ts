@@ -1,9 +1,10 @@
 /**
- * Agent state management for reasoning steps and cost tracking.
+ * Agent state management for reasoning steps, conversation turns, and cost tracking.
  *
- * Uses a simple reducer pattern. Can migrate to Zustand when
- * the settings/persistence layer lands in S5.
+ * Uses a reducer pattern with conversation history support.
  */
+
+export type AgentMode = "Chat" | "Plan" | "Ask";
 
 export type StepKind =
   | { kind: "Thought"; data: { text: string; partial: boolean } }
@@ -29,52 +30,110 @@ export interface CostSample {
   output_tokens: number;
 }
 
-export interface AgentState {
+export interface ConversationTurn {
+  turnId: string;
+  userMessage: string;
+  mode: AgentMode;
+  model: string;
   steps: ReasoningStep[];
+  startedAt: number;
+  endedAt?: number;
+  tokenUsage?: { input: number; output: number };
+}
+
+export interface AgentState {
+  turns: ConversationTurn[];
   cost: CostSample;
   activeTurnId: string | null;
   panelOpen: boolean;
+  mode: AgentMode;
+  currentProfile: string | null;
+  inputDisabled: boolean;
 }
 
 export const initialAgentState: AgentState = {
-  steps: [],
+  turns: [],
   cost: { turn_id: "", input_tokens: 0, output_tokens: 0 },
   activeTurnId: null,
   panelOpen: false,
+  mode: "Chat",
+  currentProfile: null,
+  inputDisabled: false,
 };
 
 export type AgentAction =
   | { type: "ADD_STEP"; step: ReasoningStep }
   | { type: "UPDATE_PARTIAL_THOUGHT"; stepId: string; text: string }
   | { type: "UPDATE_COST"; cost: CostSample }
-  | { type: "START_TURN"; turnId: string }
+  | { type: "START_TURN"; turnId: string; userMessage: string; mode: AgentMode; model: string }
   | { type: "END_TURN" }
+  | { type: "FINISH_TURN"; turnId: string; duration_ms: number; input_tokens: number; output_tokens: number }
   | { type: "TOGGLE_PANEL" }
   | { type: "SET_PANEL"; open: boolean }
-  | { type: "CLEAR_STEPS" };
+  | { type: "SET_MODE"; mode: AgentMode }
+  | { type: "SET_PROFILE"; profile: string }
+  | { type: "REPLACE_TURN_ID"; oldId: string; newId: string }
+  | { type: "CLEAR_CONVERSATION" };
 
 export function agentReducer(state: AgentState, action: AgentAction): AgentState {
   switch (action.type) {
-    case "ADD_STEP":
-      return { ...state, steps: [...state.steps, action.step] };
+    case "ADD_STEP": {
+      const turns = state.turns.map((t) =>
+        t.turnId === action.step.turn_id
+          ? { ...t, steps: [...t.steps, action.step] }
+          : t
+      );
+      return { ...state, turns };
+    }
 
     case "UPDATE_PARTIAL_THOUGHT": {
-      const steps = state.steps.map((s) =>
-        s.id === action.stepId && s.step.kind === "Thought"
-          ? { ...s, step: { ...s.step, data: { ...s.step.data, text: action.text } } as StepKind }
-          : s
-      );
-      return { ...state, steps };
+      const turns = state.turns.map((t) => {
+        if (t.turnId !== state.activeTurnId) return t;
+        const steps = t.steps.map((s) =>
+          s.id === action.stepId && s.step.kind === "Thought"
+            ? { ...s, step: { ...s.step, data: { ...s.step.data, text: action.text } } as StepKind }
+            : s
+        );
+        return { ...t, steps };
+      });
+      return { ...state, turns };
     }
 
     case "UPDATE_COST":
       return { ...state, cost: action.cost };
 
-    case "START_TURN":
-      return { ...state, activeTurnId: action.turnId, steps: [] };
+    case "START_TURN": {
+      const newTurn: ConversationTurn = {
+        turnId: action.turnId,
+        userMessage: action.userMessage,
+        mode: action.mode,
+        model: action.model,
+        steps: [],
+        startedAt: Date.now(),
+      };
+      return {
+        ...state,
+        activeTurnId: action.turnId,
+        inputDisabled: true,
+        turns: [...state.turns, newTurn],
+      };
+    }
 
     case "END_TURN":
-      return { ...state, activeTurnId: null };
+      return { ...state, activeTurnId: null, inputDisabled: false };
+
+    case "FINISH_TURN": {
+      const turns = state.turns.map((t) =>
+        t.turnId === action.turnId
+          ? {
+              ...t,
+              endedAt: Date.now(),
+              tokenUsage: { input: action.input_tokens, output: action.output_tokens },
+            }
+          : t
+      );
+      return { ...state, turns, activeTurnId: null, inputDisabled: false };
+    }
 
     case "TOGGLE_PANEL":
       return { ...state, panelOpen: !state.panelOpen };
@@ -82,7 +141,21 @@ export function agentReducer(state: AgentState, action: AgentAction): AgentState
     case "SET_PANEL":
       return { ...state, panelOpen: action.open };
 
-    case "CLEAR_STEPS":
-      return { ...state, steps: [] };
+    case "SET_MODE":
+      return { ...state, mode: action.mode };
+
+    case "SET_PROFILE":
+      return { ...state, currentProfile: action.profile };
+
+    case "REPLACE_TURN_ID": {
+      const turns = state.turns.map((t) =>
+        t.turnId === action.oldId ? { ...t, turnId: action.newId } : t
+      );
+      const activeTurnId = state.activeTurnId === action.oldId ? action.newId : state.activeTurnId;
+      return { ...state, turns, activeTurnId };
+    }
+
+    case "CLEAR_CONVERSATION":
+      return { ...state, turns: [], cost: { turn_id: "", input_tokens: 0, output_tokens: 0 } };
   }
 }

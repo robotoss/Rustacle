@@ -140,7 +140,10 @@ fn prompt_deterministic_across_calls() {
     let ctx = turn_context_fixture_a();
     let a = assemble_prompt(&ctx).to_system_message();
     let b = assemble_prompt(&ctx).to_system_message();
-    assert_eq!(a, b, "Two calls with identical TurnContext must produce identical output");
+    assert_eq!(
+        a, b,
+        "Two calls with identical TurnContext must produce identical output"
+    );
 }
 
 #[test]
@@ -153,7 +156,10 @@ fn changing_cwd_changes_only_env_layer() {
 
     let sections_a = prompt_a.section_names();
     let sections_b = prompt_b.section_names();
-    assert_eq!(sections_a, sections_b, "Section structure must be identical");
+    assert_eq!(
+        sections_a, sections_b,
+        "Section structure must be identical"
+    );
 
     // Find which sections differ
     let sys_a = prompt_a.to_system_message();
@@ -188,7 +194,11 @@ fn tools_filtered_by_permission() {
     ctx.permissions.granted_tools.retain(|t| t != "grep");
 
     let prompt = assemble_prompt(&ctx);
-    let tool_names: Vec<&str> = prompt.tool_schemas().iter().map(|t| t.name.as_str()).collect();
+    let tool_names: Vec<&str> = prompt
+        .tool_schemas()
+        .iter()
+        .map(|t| t.name.as_str())
+        .collect();
     assert!(!tool_names.contains(&"grep"), "grep should be filtered out");
     assert!(tool_names.contains(&"bash"), "bash should remain");
 }
@@ -200,5 +210,8 @@ fn empty_memory_omits_section() {
 
     let prompt = assemble_prompt(&ctx);
     let sections = prompt.section_names();
-    assert!(!sections.contains(&"memory"), "Empty memory should not produce a section");
+    assert!(
+        !sections.contains(&"memory"),
+        "Empty memory should not produce a section"
+    );
 }

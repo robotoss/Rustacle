@@ -4,9 +4,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::SettingsError;
 use crate::schema::SettingKey;
 use crate::store::SettingsStore;
-use crate::SettingsError;
 
 /// Schema version for the export format.
 const EXPORT_SCHEMA_VERSION: u32 = 1;
@@ -95,15 +95,9 @@ pub fn diff_import(
 ///
 /// # Errors
 /// Returns `SettingsError` on database errors.
-pub fn apply_import(
-    store: &SettingsStore,
-    payload: &SettingsExport,
-) -> Result<u32, SettingsError> {
+pub fn apply_import(store: &SettingsStore, payload: &SettingsExport) -> Result<u32, SettingsError> {
     let diffs = diff_import(store, payload)?;
-    let changed: Vec<_> = diffs
-        .into_iter()
-        .filter(|d| d.changed)
-        .collect();
+    let changed: Vec<_> = diffs.into_iter().filter(|d| d.changed).collect();
 
     let updates: Vec<(SettingKey, serde_json::Value)> = changed
         .iter()

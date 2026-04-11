@@ -58,10 +58,7 @@ impl Tool for FsReadTool {
             .and_then(Value::as_str)
             .unwrap_or("")
             .to_owned();
-        vec![Capability::Fs {
-            path,
-            write: false,
-        }]
+        vec![Capability::Fs { path, write: false }]
     }
 
     async fn call(&self, args: Value, ctx: ToolCtx) -> Result<ToolOutput, ToolError> {
@@ -71,7 +68,10 @@ impl Tool for FsReadTool {
         #[allow(clippy::cast_possible_truncation)]
         let offset = args.get("offset").and_then(Value::as_u64).unwrap_or(0) as usize;
         #[allow(clippy::cast_possible_truncation)]
-        let limit = args.get("limit").and_then(Value::as_u64).map(|l| l as usize);
+        let limit = args
+            .get("limit")
+            .and_then(Value::as_u64)
+            .map(|l| l as usize);
 
         let content = tokio::fs::read_to_string(&path)
             .await

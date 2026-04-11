@@ -23,7 +23,7 @@ const DESTRUCTIVE_PATTERNS: &[&str] = &[
 
 /// Commands that are never allowed.
 const BLOCKED_PATTERNS: &[&str] = &[
-    "sed -i",  // Use fs_edit instead
+    "sed -i", // Use fs_edit instead
 ];
 
 /// Execute a shell command.

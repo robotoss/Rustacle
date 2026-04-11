@@ -9,8 +9,8 @@ use futures_util::StreamExt;
 use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 
-use rustacle_llm::types::{ChatDelta, ChatMessage, ChatRequest, Role};
 use rustacle_llm::LlmProvider;
+use rustacle_llm::types::{ChatDelta, ChatMessage, ChatRequest, Role};
 
 use crate::prompt::assemble_prompt;
 use crate::tools::ToolDispatchTable;
@@ -100,30 +100,35 @@ impl Harness {
                 return Err(HarnessError::Cancelled);
             }
 
-            cost.elapsed_ms = start.elapsed().as_secs() * 1000 + u64::from(start.elapsed().subsec_millis());
+            cost.elapsed_ms =
+                start.elapsed().as_secs() * 1000 + u64::from(start.elapsed().subsec_millis());
             if let Some(reason) = cost.exceeds(&self.budget) {
-                self.emit_step(&turn_id, StepKind::Error {
-                    message: reason.to_owned(),
-                    retryable: false,
-                });
+                self.emit_step(
+                    &turn_id,
+                    StepKind::Error {
+                        message: reason.to_owned(),
+                        retryable: false,
+                    },
+                );
                 return Err(HarnessError::BudgetExceeded(reason.to_owned()));
             }
 
             let prompt = assemble_prompt(&ctx);
             let request = Self::build_request(&ctx, &prompt, &conversation);
 
-            let stream = self
-                .stream_with_retry(&request, &cancel, &mut cost)
+            let stream = self.stream_with_retry(&request, &cancel, &mut cost).await?;
+
+            let (answer_text, tool_calls) = self
+                .consume_stream(stream, &cancel, &turn_id, &mut cost)
                 .await?;
 
-            let (answer_text, tool_calls) =
-                self.consume_stream(stream, &cancel, &turn_id, &mut cost)
-                    .await?;
-
             if tool_calls.is_empty() {
-                self.emit_step(&turn_id, StepKind::Answer {
-                    text: answer_text.clone(),
-                });
+                self.emit_step(
+                    &turn_id,
+                    StepKind::Answer {
+                        text: answer_text.clone(),
+                    },
+                );
                 info!(turn_id = %turn_id, tokens = cost.total_tokens(), "turn complete");
                 return Ok(answer_text);
             }
@@ -140,17 +145,17 @@ impl Harness {
                 let args: serde_json::Value =
                     serde_json::from_str(&call.args_json).unwrap_or_default();
 
-                self.emit_step(&turn_id, StepKind::ToolCall {
-                    tool: call.name.clone(),
-                    args: args.clone(),
-                    tab_target: None,
-                });
+                self.emit_step(
+                    &turn_id,
+                    StepKind::ToolCall {
+                        tool: call.name.clone(),
+                        args: args.clone(),
+                        tab_target: None,
+                    },
+                );
 
                 let tool_start = Instant::now();
-                let result = self
-                    .tools
-                    .dispatch(&call.name, args, cancel.child())
-                    .await;
+                let result = self.tools.dispatch(&call.name, args, cancel.child()).await;
                 #[allow(clippy::cast_possible_truncation)]
                 let duration_ms = tool_start.elapsed().as_millis().min(u128::from(u32::MAX)) as u32;
 
@@ -159,12 +164,15 @@ impl Harness {
                     Err(e) => (false, e),
                 };
 
-                self.emit_step(&turn_id, StepKind::ToolResult {
-                    tool: call.name.clone(),
-                    ok,
-                    summary: summary.clone(),
-                    duration_ms,
-                });
+                self.emit_step(
+                    &turn_id,
+                    StepKind::ToolResult {
+                        tool: call.name.clone(),
+                        ok,
+                        summary: summary.clone(),
+                        duration_ms,
+                    },
+                );
 
                 conversation.push(ChatMessage {
                     role: Role::Tool,
@@ -260,19 +268,25 @@ impl Harness {
                     thought_buf.push(&text);
                     if thought_buf.should_flush_sentence() {
                         let chunk = thought_buf.take();
-                        self.emit_step(turn_id, StepKind::Thought {
-                            text: chunk,
-                            partial: true,
-                        });
+                        self.emit_step(
+                            turn_id,
+                            StepKind::Thought {
+                                text: chunk,
+                                partial: true,
+                            },
+                        );
                     }
                 }
                 ChatDelta::ToolUseStart { id, name } => {
                     if !thought_buf.is_empty() {
                         let chunk = thought_buf.take();
-                        self.emit_step(turn_id, StepKind::Thought {
-                            text: chunk,
-                            partial: true,
-                        });
+                        self.emit_step(
+                            turn_id,
+                            StepKind::Thought {
+                                text: chunk,
+                                partial: true,
+                            },
+                        );
                     }
                     current_tool_id = id;
                     current_tool_name = name;
@@ -304,10 +318,13 @@ impl Harness {
 
         if !thought_buf.is_empty() {
             let chunk = thought_buf.take();
-            self.emit_step(turn_id, StepKind::Thought {
-                text: chunk,
-                partial: false,
-            });
+            self.emit_step(
+                turn_id,
+                StepKind::Thought {
+                    text: chunk,
+                    partial: false,
+                },
+            );
         }
 
         Ok((answer_text, tool_calls))
@@ -341,7 +358,10 @@ impl Harness {
                 Err(e) if attempt < max_retries => {
                     let retryable = matches!(
                         &e,
-                        rustacle_llm::provider::LlmError::Provider { retryable: true, .. }
+                        rustacle_llm::provider::LlmError::Provider {
+                            retryable: true,
+                            ..
+                        }
                     );
                     if retryable {
                         let backoff_ms = 500 * u64::from(2u32.pow(attempt - 1));

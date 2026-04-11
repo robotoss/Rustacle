@@ -91,9 +91,8 @@ impl ToolDispatchTable {
         calls: Vec<(String, String, serde_json::Value)>, // (id, name, args)
         parent_cancel: CancellationToken,
     ) -> Vec<(String, Result<String, String>)> {
-        let (concurrent, serialized): (Vec<_>, Vec<_>) = calls
-            .into_iter()
-            .partition(|(_, name, _)| {
+        let (concurrent, serialized): (Vec<_>, Vec<_>) =
+            calls.into_iter().partition(|(_, name, _)| {
                 self.by_name
                     .get(name.as_str())
                     .is_some_and(|t| t.concurrency() == Concurrency::Concurrent)

@@ -9,4 +9,4 @@ pub mod state;
 
 pub use kernel::Kernel;
 pub use registry::PluginRegistry;
-pub use state::AppState;
+pub use state::{AgentSession, AppState};

@@ -40,6 +40,20 @@ const OVERLAY_OPENAI: &str = include_str!("text/overlay_openai.txt");
 const OVERLAY_ANTHROPIC: &str = include_str!("text/overlay_anthropic.txt");
 const OVERLAY_LOCAL: &str = include_str!("text/overlay_local.txt");
 
+/// Mode overlay texts.
+pub const OVERLAY_PLAN_MODE: &str = include_str!("text/overlay_plan_mode.txt");
+pub const OVERLAY_ASK_MODE: &str = include_str!("text/overlay_ask_mode.txt");
+
+/// Render mode overlay. Returns empty string for Chat mode (no overlay needed).
+#[must_use]
+pub fn render_mode_overlay(ctx: &TurnContext) -> String {
+    match ctx.extra.get("mode").map(String::as_str) {
+        Some("Plan") => OVERLAY_PLAN_MODE.to_owned(),
+        Some("Ask") => OVERLAY_ASK_MODE.to_owned(),
+        _ => String::new(), // Chat mode: no overlay
+    }
+}
+
 /// Render the environment context layer from tab/OS snapshots.
 #[must_use]
 pub fn render_env_context(ctx: &TurnContext) -> String {

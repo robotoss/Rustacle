@@ -5,12 +5,12 @@
 
 mod registry;
 
+pub mod bash;
 pub mod fs_edit;
 pub mod fs_read;
 pub mod fs_write;
-pub mod grep;
 pub mod glob;
-pub mod bash;
+pub mod grep;
 pub mod sub_agent;
 
 pub use registry::ToolDispatchTable;

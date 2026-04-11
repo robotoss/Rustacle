@@ -39,7 +39,14 @@ impl LlmProvider for OpenAiProvider {
         request: ChatRequest,
         cancel: CancellationToken,
     ) -> Result<ChatStream, LlmError> {
-        streaming::stream_openai(&self.client, &self.api_base, self.api_key.as_deref(), request, cancel).await
+        streaming::stream_openai(
+            &self.client,
+            &self.api_base,
+            self.api_key.as_deref(),
+            request,
+            cancel,
+        )
+        .await
     }
 
     async fn list_models(&self) -> Result<Vec<String>, LlmError> {

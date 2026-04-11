@@ -193,6 +193,12 @@ mod tests {
     fn parse_usage() {
         let event = r#"data: {"usage":{"prompt_tokens":100,"completion_tokens":50}}"#;
         let delta = parse_sse_event(event).unwrap();
-        assert!(matches!(delta, ChatDelta::Usage { input_tokens: 100, output_tokens: 50 }));
+        assert!(matches!(
+            delta,
+            ChatDelta::Usage {
+                input_tokens: 100,
+                output_tokens: 50
+            }
+        ));
     }
 }

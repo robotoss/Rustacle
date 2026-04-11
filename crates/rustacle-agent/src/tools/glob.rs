@@ -57,18 +57,12 @@ impl Tool for GlobTool {
             .and_then(Value::as_str)
             .unwrap_or(".")
             .to_owned();
-        vec![Capability::Fs {
-            path,
-            write: false,
-        }]
+        vec![Capability::Fs { path, write: false }]
     }
 
     async fn call(&self, args: Value, ctx: ToolCtx) -> Result<ToolOutput, ToolError> {
         let pattern = args["pattern"].as_str().unwrap_or("");
-        let base = args
-            .get("path")
-            .and_then(Value::as_str)
-            .unwrap_or(".");
+        let base = args.get("path").and_then(Value::as_str).unwrap_or(".");
         let base_path = ctx.cwd.join(base);
 
         let full_pattern = base_path.join(pattern);

@@ -201,9 +201,7 @@ fn stock_tool_schema(tool_id: &str) -> ToolSchema {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::turn_context::{
-        HostOs, PermissionView, TabSnapshot, UserMessage,
-    };
+    use crate::turn_context::{HostOs, PermissionView, TabSnapshot, UserMessage};
 
     #[test]
     fn filters_by_permission() {

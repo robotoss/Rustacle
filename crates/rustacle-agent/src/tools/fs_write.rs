@@ -99,10 +99,7 @@ impl Tool for FsWriteTool {
 
         let lines = content.lines().count();
         let size_kib = content.len() / 1024;
-        let summary = format!(
-            "wrote {lines} lines ({size_kib} KiB) to {}",
-            path.display()
-        );
+        let summary = format!("wrote {lines} lines ({size_kib} KiB) to {}", path.display());
 
         Ok(ToolOutput {
             summary,
