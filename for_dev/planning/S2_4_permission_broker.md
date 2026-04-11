@@ -24,18 +24,18 @@ crates/rustacle-kernel/src/permission/
 ```
 
 ## Checklist
-- [ ] `PermissionBroker::check()` returns a cached `Grant` immediately if present
-- [ ] `PermissionBroker::check()` sends a `PermissionAsk` via channel when no cached grant exists
-- [ ] `PermissionAsk` includes the capability, plugin ID, and a `oneshot::Sender<PermissionDecision>` for the UI to respond
-- [ ] `PermissionBroker::invalidate()` removes a specific cache entry by plugin + capability
-- [ ] `PermissionDecision` enum has `Allow`, `AllowSession`, `Deny` variants
-- [ ] Fs capability key uses canonicalized path with prefix matching (granting `/home/user/project` covers `/home/user/project/src/main.rs`)
-- [ ] Net capability key uses host pattern matching (`*.openai.com` matches `api.openai.com`)
-- [ ] Secret capability key uses exact key match
-- [ ] All cache hits are logged at `tracing::trace` level
-- [ ] Thread-safe via `DashMap` — no `Mutex` on the hot path
-- [ ] Denials are NOT cached permanently — user can retry
-- [ ] `Grant` has an optional TTL or session scope
+- [x] `PermissionBroker::check()` returns a cached `Grant` immediately if present
+- [x] `PermissionBroker::check()` sends a `PermissionAsk` via channel when no cached grant exists
+- [x] `PermissionAsk` includes the capability, plugin ID, and a `oneshot::Sender<PermissionDecision>` for the UI to respond
+- [x] `PermissionBroker::invalidate()` removes a specific cache entry by plugin + capability
+- [x] `PermissionDecision` enum has `Allow`, `AllowSession`, `Deny` variants
+- [x] Fs capability key uses canonicalized path with prefix matching (granting `/home/user/project` covers `/home/user/project/src/main.rs`)
+- [x] Net capability key uses host pattern matching (`*.openai.com` matches `api.openai.com`)
+- [x] Secret capability key uses exact key match
+- [x] All cache hits are logged at `tracing::trace` level
+- [x] Thread-safe via `DashMap` — no `Mutex` on the hot path
+- [x] Denials are NOT cached permanently — user can retry
+- [ ] `Grant` has an optional TTL or session scope *(AllowSession variant exists; TTL deferred)*
 
 ## Acceptance criteria
 ```bash

@@ -26,14 +26,14 @@ scripts/
 ```
 
 ## Checklist
-- [ ] `rustacle.wit` contains `package rustacle:plugin@0.1.0`
-- [ ] `rustacle.wit` defines `interface types` with all shared types (context, command-result, event, capability, etc.)
-- [ ] `rustacle.wit` defines `interface module` (what plugins export)
-- [ ] `rustacle.wit` defines `interface host` (what the host provides to plugins)
-- [ ] `rustacle.wit` defines `world plugin` composing module + host
-- [ ] `scripts/check-wit.sh` runs `wasm-tools component wit` (or `wit-parser`) and exits 0
-- [ ] `wit-bindgen rust` can generate Rust bindings from the WIT file without errors
-- [ ] `Cargo.toml` has `[package.metadata.component]` pointing to the WIT directory
+- [x] `rustacle.wit` contains `package rustacle:plugin@0.1.0`
+- [x] `rustacle.wit` defines `interface types` with all shared types (capability, module-manifest, module-error, etc.)
+- [x] `rustacle.wit` defines `interface module` (what plugins export)
+- [x] `rustacle.wit` defines `interface host` (what the host provides to plugins)
+- [x] `rustacle.wit` defines `world plugin` composing module + host
+- [x] `scripts/check-wit.sh` runs `wasm-tools component wit` (or `wit-parser`) and exits 0
+- [ ] `wit-bindgen rust` can generate Rust bindings from the WIT file without errors *(requires wasm-tools install)*
+- [ ] `Cargo.toml` has `[package.metadata.component]` pointing to the WIT directory *(deferred to S2.5)*
 
 ## Acceptance criteria
 ```bash

@@ -26,17 +26,17 @@ crates/rustacle-plugin-api/src/
 ```
 
 ## Checklist
-- [ ] `RustacleModule` is an `async_trait` with methods: `init`, `handle_command`, `on_event`, `shutdown`, `export_state`, `import_state`
-- [ ] All types derive `Clone`, `Debug`, `Serialize`, `Deserialize`
-- [ ] Types that cross the Tauri IPC boundary also derive `specta::Type`
-- [ ] `ModuleError` uses `thiserror` with `#[error(...)]` messages
-- [ ] `Capability` enum covers: `Fs(PathScope, FsMode)`, `Net(HostPattern)`, `Pty`, `Secret(String)`, `LlmProvider`
-- [ ] `PathScope` wraps a canonicalized path prefix
-- [ ] `FsMode` has `ReadOnly` and `ReadWrite` variants
-- [ ] `HostPattern` supports wildcard matching (e.g., `*.openai.com`)
-- [ ] `ModuleManifest` includes: `id`, `name`, `version`, `capabilities`, `ui_contributions`
-- [ ] `UiContributions` includes `panels: Vec<PanelDesc>` and `palette_commands: Vec<PaletteEntry>`
-- [ ] No runtime logic — only type definitions and trait declarations
+- [x] `RustacleModule` is an `async_trait` with methods: `init`, `call`, `on_event`, `shutdown`, `export_state`, `import_state`
+- [x] All types derive `Clone`, `Debug`, `Serialize`, `Deserialize`
+- [x] Types that cross the Tauri IPC boundary also derive `specta::Type`
+- [x] `ModuleError` uses `thiserror` with `#[error(...)]` messages
+- [x] `Capability` enum covers: `Fs(PathScope, FsMode)`, `Net(HostPattern)`, `Pty`, `Secret(String)`, `LlmProvider`
+- [x] `PathScope` wraps a canonicalized path prefix
+- [x] `FsMode` has `ReadOnly` and `ReadWrite` variants
+- [x] `HostPattern` supports wildcard matching (e.g., `*.openai.com`)
+- [x] `ModuleManifest` includes: `id`, `name`, `version`, `capabilities`, `ui_contributions`
+- [x] `UiContributions` includes `panels: Vec<PanelDesc>` and `palette_commands: Vec<PaletteEntry>`
+- [x] No runtime logic — only type definitions and trait declarations
 
 ## Acceptance criteria
 ```bash
