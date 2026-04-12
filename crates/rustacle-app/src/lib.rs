@@ -123,12 +123,20 @@ async fn send_prompt(
     let message = request.message.clone();
     let session = Arc::clone(&state.agent_session);
 
-    // Spawn the agent turn in the background
+    // Spawn the agent turn in the background.
+    // Placeholder: emits thought + answer. Real harness replaces this.
     tokio::spawn(async move {
-        // For now, emit a placeholder thought + answer since we don't have
-        // a configured LLM provider wired in yet. The real harness integration
-        // will replace this once the LLM registry is available in AppState.
         let start = std::time::Instant::now();
+
+        // Give the frontend time to process START_TURN before emitting events.
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        // Check cancellation before each step.
+        if cancel_token.is_cancelled() {
+            emit_turn_end(&app, &turn_id_clone, &start);
+            cleanup_session(&session, &turn_id_clone, &message, "Cancelled").await;
+            return;
+        }
 
         let mode_label = match mode {
             AgentMode::Chat => "Chat",
@@ -136,23 +144,28 @@ async fn send_prompt(
             AgentMode::Ask => "Ask",
         };
 
-        // Emit a thought showing the mode
-        let thought_step = ReasoningStepEvent {
-            id: ulid::Ulid::new().to_string(),
-            parent_id: None,
-            turn_id: turn_id_clone.clone(),
-            ts_ms: now_ms(),
-            step: IpcReasoningStep::Thought {
+        emit_reasoning(
+            &app,
+            &turn_id_clone,
+            IpcReasoningStep::Thought {
                 text: format!("[{mode_label} mode] Processing: {message}"),
                 partial: false,
             },
-        };
-        let _ = app.emit("agent:reasoning", &thought_step);
+        );
 
-        // Simulate a brief delay for responsiveness
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        // Simulate LLM processing time — cancellable.
+        tokio::select! {
+            () = tokio::time::sleep(std::time::Duration::from_millis(500)) => {}
+            () = cancel_token.cancelled() => {
+                emit_reasoning(&app, &turn_id_clone, IpcReasoningStep::Answer {
+                    text: "Cancelled by user.".to_owned(),
+                });
+                emit_turn_end(&app, &turn_id_clone, &start);
+                cleanup_session(&session, &turn_id_clone, &message, "Cancelled").await;
+                return;
+            }
+        }
 
-        // Emit the answer
         let answer_text = match mode {
             AgentMode::Ask => format!(
                 "This is the Ask mode placeholder response to: \"{message}\"\n\n\
@@ -166,51 +179,29 @@ async fn send_prompt(
             ),
             AgentMode::Chat => format!(
                 "Placeholder response to: \"{message}\"\n\n\
-                 Configure an LLM provider in Settings → Model Profiles to enable real agent interaction."
+                 Configure an LLM provider in Settings -> Model Profiles to enable real agent interaction."
             ),
         };
 
-        let answer_step = ReasoningStepEvent {
-            id: ulid::Ulid::new().to_string(),
-            parent_id: None,
-            turn_id: turn_id_clone.clone(),
-            ts_ms: now_ms(),
-            step: IpcReasoningStep::Answer {
+        emit_reasoning(
+            &app,
+            &turn_id_clone,
+            IpcReasoningStep::Answer {
                 text: answer_text.clone(),
             },
-        };
-        let _ = app.emit("agent:reasoning", &answer_step);
+        );
 
-        // Emit cost
-        let cost = CostSampleEvent {
-            turn_id: turn_id_clone.clone(),
-            input_tokens: 0,
-            output_tokens: 0,
-        };
-        let _ = app.emit("agent:cost", &cost);
+        let _ = app.emit(
+            "agent:cost",
+            &CostSampleEvent {
+                turn_id: turn_id_clone.clone(),
+                input_tokens: 0,
+                output_tokens: 0,
+            },
+        );
 
-        // Emit turn end
-        #[allow(clippy::cast_possible_truncation)]
-        let duration_ms = start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
-        let turn_end = TurnEndEvent {
-            turn_id: turn_id_clone.clone(),
-            duration_ms,
-            input_tokens: 0,
-            output_tokens: 0,
-            tool_calls: 0,
-        };
-        let _ = app.emit("agent:turn_end", &turn_end);
-
-        // Update session history
-        {
-            let mut sess = session.lock().await;
-            sess.active_cancels.remove(&turn_id_clone);
-            sess.history
-                .push(rustacle_kernel::state::AgentHistoryEntry {
-                    user_message: message,
-                    assistant_answer: answer_text,
-                });
-        }
+        emit_turn_end(&app, &turn_id_clone, &start);
+        cleanup_session(&session, &turn_id_clone, &message, &answer_text).await;
     });
 
     Ok(SendPromptResponse { turn_id })
@@ -426,6 +417,50 @@ async fn respond_permission(_request: RespondPermissionRequest) -> Result<(), Ru
     // once permission flow is fully wired.
     warn!("respond_permission not yet connected to harness");
     Ok(())
+}
+
+/// Emit a reasoning step event.
+fn emit_reasoning(app: &tauri::AppHandle, turn_id: &str, step: IpcReasoningStep) {
+    let event = ReasoningStepEvent {
+        id: ulid::Ulid::new().to_string(),
+        parent_id: None,
+        turn_id: turn_id.to_owned(),
+        ts_ms: now_ms(),
+        step,
+    };
+    let _ = app.emit("agent:reasoning", &event);
+}
+
+/// Emit a `turn_end` event.
+fn emit_turn_end(app: &tauri::AppHandle, turn_id: &str, start: &std::time::Instant) {
+    #[allow(clippy::cast_possible_truncation)]
+    let duration_ms = start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
+    let _ = app.emit(
+        "agent:turn_end",
+        &TurnEndEvent {
+            turn_id: turn_id.to_owned(),
+            duration_ms,
+            input_tokens: 0,
+            output_tokens: 0,
+            tool_calls: 0,
+        },
+    );
+}
+
+/// Cleanup session after a turn completes.
+async fn cleanup_session(
+    session: &Arc<Mutex<rustacle_kernel::AgentSession>>,
+    turn_id: &str,
+    user_message: &str,
+    answer: &str,
+) {
+    let mut sess = session.lock().await;
+    sess.active_cancels.remove(turn_id);
+    sess.history
+        .push(rustacle_kernel::state::AgentHistoryEntry {
+            user_message: user_message.to_owned(),
+            assistant_answer: answer.to_owned(),
+        });
 }
 
 /// Get current Unix time in milliseconds.

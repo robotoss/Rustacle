@@ -121,22 +121,45 @@ export default function AgentPanel() {
     };
   }, []);
 
+  // Auto-select first profile when none selected
+  useEffect(() => {
+    if (!state.currentProfile) {
+      commands.listModelProfiles().then((res) => {
+        if (res.status === "ok" && res.data.profiles.length > 0) {
+          dispatch({ type: "SET_PROFILE", profile: res.data.profiles[0].name });
+        }
+      }).catch(() => {});
+    }
+  }, [state.currentProfile]);
+
+  // Reload profile on settings change
+  useEffect(() => {
+    const unlisten = listen("settings:changed", (event) => {
+      const payload = event.payload as { key?: string };
+      if (!payload.key || payload.key === "model.profiles") {
+        // Re-check if current profile still exists, auto-select first if not
+        commands.listModelProfiles().then((res) => {
+          if (res.status === "ok") {
+            const names = res.data.profiles.map((p) => p.name);
+            if (state.currentProfile && !names.includes(state.currentProfile)) {
+              dispatch({ type: "SET_PROFILE", profile: names[0] ?? null as unknown as string });
+            } else if (!state.currentProfile && names.length > 0) {
+              dispatch({ type: "SET_PROFILE", profile: names[0] });
+            }
+          }
+        }).catch(() => {});
+      }
+    });
+    return () => { unlisten.then((f) => f()); };
+  }, [state.currentProfile]);
+
   const handleSend = useCallback(
     async (message: string) => {
       const model = state.currentProfile ?? "default";
       const mode = state.mode;
 
-      // Optimistically start the turn in UI with a temp ID
-      const tempTurnId = `pending-${Date.now()}`;
-      dispatch({
-        type: "START_TURN",
-        turnId: tempTurnId,
-        userMessage: message,
-        mode,
-        model,
-      });
-
       try {
+        // Get turn_id from backend FIRST, then create the turn in UI
         const result = await commands.sendPrompt({
           message,
           model_profile: state.currentProfile,
@@ -144,17 +167,16 @@ export default function AgentPanel() {
         });
 
         if (result.status === "ok") {
-          // Replace temp turn_id with the real one from backend
           dispatch({
-            type: "REPLACE_TURN_ID",
-            oldId: tempTurnId,
-            newId: result.data.turn_id,
+            type: "START_TURN",
+            turnId: result.data.turn_id,
+            userMessage: message,
+            mode,
+            model,
           });
-        } else {
-          dispatch({ type: "END_TURN" });
         }
       } catch {
-        dispatch({ type: "END_TURN" });
+        // Failed to send — don't lock the input
       }
     },
     [state.currentProfile, state.mode]
@@ -167,6 +189,8 @@ export default function AgentPanel() {
       } catch {
         // Best effort
       }
+      // Force end turn in UI immediately — don't wait for backend event
+      dispatch({ type: "END_TURN" });
     }
   }, [state.activeTurnId]);
 
