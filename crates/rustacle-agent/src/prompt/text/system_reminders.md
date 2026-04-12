@@ -1,3 +1,15 @@
+---
+id: system-reminders
+name: System Reminders
+description: "Behavioral nudges appended before user turn: skip filler, prefer tools, loop avoidance"
+type: section
+tags: [reminders, quality]
+requires: []
+excludes: []
+audience: [all]
+priority: 1900
+---
+
 # Reminders
 - The user can see every Thought you stream. Skip filler — no "Let me think
   about this" or "I'll now proceed to".

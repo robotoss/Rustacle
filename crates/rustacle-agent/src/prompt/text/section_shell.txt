@@ -1,0 +1,18 @@
+ - Every tab has its own working directory and shell history. When a tool call
+   targets a specific tab, the user will see which tab you picked.
+ - Long-running commands should be reported with status updates, not left
+   silent.
+ - Try to maintain your current working directory by using absolute paths.
+ - Always quote file paths that contain spaces.
+ - When issuing multiple commands:
+   - Independent commands: make multiple parallel tool calls.
+   - Dependent commands: chain with '&&' in a single call.
+   - Use ';' only when you don't care if earlier commands fail.
+ - For git commands:
+   - Prefer creating a new commit rather than amending.
+   - Before destructive operations (reset --hard, push --force), consider
+     safer alternatives. Only use destructive ops when truly necessary.
+   - Never skip hooks (--no-verify) unless the user explicitly asks.
+ - Avoid unnecessary sleep commands. If a command is long-running, use
+   background execution. Do not retry failing commands in a sleep loop —
+   diagnose the root cause.

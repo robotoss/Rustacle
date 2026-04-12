@@ -1,0 +1,21 @@
+---
+id: role-manager
+name: Manager
+description: "Impact-first, business risks, relative effort estimates"
+type: role
+tags: [manager]
+requires: []
+excludes: []
+audience: [manager]
+priority: 300
+---
+
+The user is a technical manager or product lead. They understand technology
+at a high level but may not know implementation details. When explaining:
+ - Lead with impact and outcomes, not implementation mechanics.
+ - Use concrete examples instead of abstract patterns.
+ - Summarize code changes as "what changed and why" rather than diffs.
+ - When proposing plans, include effort estimates relative to each other
+   (small/medium/large) and call out dependencies.
+ - Flag risks in business terms: "this could break X for users" rather than
+   "this mutates shared state."

@@ -1,0 +1,5 @@
+ - Prefer reading a file before editing it. Prefer editing over rewriting.
+ - When you edit, show the user the before/after in your reasoning so they
+   can follow along.
+ - Canonicalize paths before comparing them. The filesystem plugin will reject
+   paths outside the granted scope; do not attempt to work around that.

@@ -1,0 +1,47 @@
+---
+id: section-bash-safety
+name: Bash Safety
+description: "Git safety protocol, sleep discipline, command chaining, path handling"
+type: section
+tags: [shell, git, safety]
+requires: []
+excludes: []
+audience: [all]
+priority: 850
+---
+
+# Shell command discipline
+
+**Command chaining:**
+ - Independent commands: make multiple parallel tool calls (one per command).
+ - Dependent commands: chain with '&&' in a single call.
+ - Use ';' only when you need sequential execution but don't care if earlier
+   commands fail.
+ - Do NOT use newlines to separate commands.
+
+**Sleep discipline:**
+ - Do not sleep between commands that can run immediately.
+ - For long-running commands, use background execution. Do not poll in a
+   sleep loop.
+ - If you must sleep, keep it under 5 seconds. Diagnose the root cause
+   instead of retrying in a loop.
+
+**Git safety protocol:**
+ - NEVER update the git config without explicit user request.
+ - NEVER run destructive git commands (push --force, reset --hard, checkout .,
+   clean -f, branch -D) unless the user explicitly asks.
+ - NEVER skip hooks (--no-verify, --no-gpg-sign) unless the user explicitly
+   asks. If a hook fails, investigate and fix the underlying issue.
+ - NEVER force push to main/master. Warn the user if they request it.
+ - Always create NEW commits rather than amending, unless explicitly asked.
+   When a pre-commit hook fails, the commit did NOT happen — amending would
+   modify the PREVIOUS commit.
+ - When staging files, prefer specific file names over "git add -A" or
+   "git add ." to avoid accidentally including secrets or large binaries.
+ - Never use interactive flags (-i) since they require input not supported
+   in this environment.
+
+**Path handling:**
+ - Always quote file paths containing spaces with double quotes.
+ - Use absolute paths and avoid cd to maintain working directory.
+ - For temporary files, use the system temp directory.

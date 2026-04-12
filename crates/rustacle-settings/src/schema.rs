@@ -26,6 +26,8 @@ pub enum SettingKey {
     AgentFlushMs,
     /// Memory top-K for prompt assembly.
     AgentMemoryTopK,
+    /// Agent role: "developer" or "manager". Affects prompt tone.
+    AgentRole,
 
     // --- Terminal ---
     /// Default shell path.
@@ -60,6 +62,7 @@ impl SettingKey {
             Self::AgentMaxTokens => "agent.max_tokens",
             Self::AgentFlushMs => "agent.flush_ms",
             Self::AgentMemoryTopK => "agent.memory_top_k",
+            Self::AgentRole => "agent.role",
             Self::TerminalShell => "terminal.shell",
             Self::TerminalFontSize => "terminal.font_size",
             Self::TerminalFontFamily => "terminal.font_family",
@@ -81,6 +84,7 @@ impl SettingKey {
             Self::AgentMaxTokens => serde_json::json!(100_000),
             Self::AgentFlushMs => serde_json::json!(80),
             Self::AgentMemoryTopK => serde_json::json!(6),
+            Self::AgentRole => serde_json::json!("developer"),
             Self::TerminalShell => serde_json::json!(""),
             Self::TerminalFontSize => serde_json::json!(14),
             Self::TerminalFontFamily => serde_json::json!("monospace"),
@@ -101,6 +105,9 @@ impl SettingKey {
             Self::AgentMaxTokens => "Maximum total tokens per turn",
             Self::AgentFlushMs => "Thought flush interval (ms)",
             Self::AgentMemoryTopK => "Number of memory entries in prompt",
+            Self::AgentRole => {
+                "Agent role (developer/manager/blogger/analyst/devops/designer/student)"
+            }
             Self::TerminalShell => "Default shell path (empty = auto-detect)",
             Self::TerminalFontSize => "Terminal font size in pixels",
             Self::TerminalFontFamily => "Terminal font family",
@@ -120,6 +127,7 @@ impl SettingKey {
         Self::AgentMaxTokens,
         Self::AgentFlushMs,
         Self::AgentMemoryTopK,
+        Self::AgentRole,
         Self::TerminalShell,
         Self::TerminalFontSize,
         Self::TerminalFontFamily,

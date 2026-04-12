@@ -18,9 +18,37 @@ const SELECTED_FILE_BUDGET: usize = 8 * 1024;
 /// Default top-K for memory entries.
 const MEMORY_TOP_K: usize = 6;
 
-/// Immutable system base. Identity, safety posture, output contract.
-/// Must match `prompts_catalog.md` section 1 verbatim.
+/// Immutable system base — slim identity line.
 pub const SYSTEM_BASE: &str = include_str!("text/system_base.txt");
+
+/// Modular prompt sections. Each is an independent, composable block.
+pub const SECTION_IDENTITY: &str = include_str!("text/section_identity.txt");
+pub const SECTION_SYSTEM: &str = include_str!("text/section_system.txt");
+pub const SECTION_DOING_TASKS: &str = include_str!("text/section_doing_tasks.txt");
+pub const SECTION_SAFETY: &str = include_str!("text/section_safety.txt");
+pub const SECTION_ACTIONS: &str = include_str!("text/section_actions.txt");
+pub const SECTION_TOOLS: &str = include_str!("text/section_tools.txt");
+pub const SECTION_OUTPUT: &str = include_str!("text/section_output.txt");
+pub const SECTION_TONE: &str = include_str!("text/section_tone.txt");
+pub const SECTION_FILES: &str = include_str!("text/section_files.txt");
+pub const SECTION_SHELL: &str = include_str!("text/section_shell.txt");
+
+/// Ref-integrated sections (from cc-src patterns, adapted for generic agent use).
+pub const SECTION_RISK_TAXONOMY: &str = include_str!("text/section_risk_taxonomy.txt");
+pub const SECTION_TOOL_PREFERENCE: &str = include_str!("text/section_tool_preference.txt");
+pub const SECTION_BASH_SAFETY: &str = include_str!("text/section_bash_safety.txt");
+pub const SECTION_CYBER_BOUNDARY: &str = include_str!("text/section_cyber_boundary.txt");
+pub const SECTION_LOOP_AVOIDANCE: &str = include_str!("text/section_loop_avoidance.txt");
+pub const SECTION_RESULT_PERSISTENCE: &str = include_str!("text/section_result_persistence.txt");
+
+/// Role overlays — audience-specific guidance.
+pub const ROLE_DEVELOPER: &str = include_str!("text/role_developer.txt");
+pub const ROLE_MANAGER: &str = include_str!("text/role_manager.txt");
+pub const ROLE_BLOGGER: &str = include_str!("text/role_blogger.txt");
+pub const ROLE_ANALYST: &str = include_str!("text/role_analyst.txt");
+pub const ROLE_DEVOPS: &str = include_str!("text/role_devops.txt");
+pub const ROLE_DESIGNER: &str = include_str!("text/role_designer.txt");
+pub const ROLE_STUDENT: &str = include_str!("text/role_student.txt");
 
 /// System reminders appended just before the user turn.
 pub const SYSTEM_REMINDERS: &str = include_str!("text/system_reminders.txt");
@@ -51,6 +79,21 @@ pub fn render_mode_overlay(ctx: &TurnContext) -> String {
         Some("Plan") => OVERLAY_PLAN_MODE.to_owned(),
         Some("Ask") => OVERLAY_ASK_MODE.to_owned(),
         _ => String::new(), // Chat mode: no overlay
+    }
+}
+
+/// Render role overlay based on `TurnContext.extra["role"]`.
+/// Defaults to developer if not specified.
+#[must_use]
+pub fn render_role_overlay(ctx: &TurnContext) -> String {
+    match ctx.extra.get("role").map(String::as_str) {
+        Some("manager") => ROLE_MANAGER.to_owned(),
+        Some("blogger") => ROLE_BLOGGER.to_owned(),
+        Some("analyst") => ROLE_ANALYST.to_owned(),
+        Some("devops") => ROLE_DEVOPS.to_owned(),
+        Some("designer") => ROLE_DESIGNER.to_owned(),
+        Some("student") => ROLE_STUDENT.to_owned(),
+        _ => ROLE_DEVELOPER.to_owned(),
     }
 }
 

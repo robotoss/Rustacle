@@ -1,3 +1,15 @@
+---
+id: mode-plan
+name: Plan Mode
+description: "Read-only analysis, numbered plan output, no file modifications"
+type: mode
+tags: [Plan]
+requires: []
+excludes: []
+audience: [all]
+priority: 1200
+---
+
 You are in PLANNING mode. Your job is to analyze and plan, not execute.
 
 Rules:

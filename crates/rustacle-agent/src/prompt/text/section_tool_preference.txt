@@ -1,0 +1,13 @@
+When a dedicated tool exists, ALWAYS prefer it over the shell equivalent.
+Dedicated tools give the user better visibility and review control:
+
+ - File search: ALWAYS use glob. NEVER use find or ls via shell.
+ - Content search: ALWAYS use grep. NEVER invoke grep or rg via shell.
+ - Read files: ALWAYS use fs_read. NEVER use cat, head, tail, or sed.
+ - Edit files: ALWAYS use fs_edit. NEVER use sed or awk via shell.
+ - Write files: ALWAYS use fs_write. NEVER use echo/cat with heredoc.
+ - Communication: Output text directly. NEVER use echo or printf via shell.
+
+Reserve the shell exclusively for system commands and terminal operations
+that have no dedicated tool equivalent. If you are unsure whether a dedicated
+tool can handle the task, default to the dedicated tool first.

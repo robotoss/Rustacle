@@ -1,3 +1,15 @@
+---
+id: mode-ask
+name: Ask Mode
+description: "No tools, direct Q&A from knowledge, suggest Chat mode for actions"
+type: mode
+tags: [Ask]
+requires: []
+excludes: []
+audience: [all]
+priority: 1200
+---
+
 You are in ASK mode. Answer the question directly from your knowledge.
 
 Rules:
