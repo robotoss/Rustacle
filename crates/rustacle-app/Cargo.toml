@@ -31,6 +31,8 @@ specta-typescript = "0.0.11"
 tokio = { version = "1", features = ["full"] }
 tokio-util = "0.7"
 bytes = "1"
+dirs = "6"
+reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tracing = "0.1"

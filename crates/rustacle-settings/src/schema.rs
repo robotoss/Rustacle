@@ -118,6 +118,12 @@ impl SettingKey {
         }
     }
 
+    /// Look up a key by its string representation.
+    #[must_use]
+    pub fn from_key_str(s: &str) -> Option<Self> {
+        Self::ALL.iter().find(|k| k.as_str() == s).copied()
+    }
+
     /// All known keys (for iteration).
     pub const ALL: &'static [SettingKey] = &[
         Self::DefaultProfile,

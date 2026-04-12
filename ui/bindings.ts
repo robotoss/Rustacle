@@ -26,10 +26,16 @@ export const commands = {
 	sendPrompt: (request: SendPromptRequest) => typedError<SendPromptResponse, RustacleError>(__TAURI_INVOKE("send_prompt", { request })),
 	// Stop an active agent turn.
 	stopTurn: (request: StopTurnRequest) => typedError<StopTurnResponse, RustacleError>(__TAURI_INVOKE("stop_turn", { request })),
-	// List available model profiles from settings.
+	// List available model profiles from settings store.
 	listModelProfiles: () => typedError<ListModelProfilesResponse, RustacleError>(__TAURI_INVOKE("list_model_profiles")),
 	// Respond to a permission request from the agent.
 	respondPermission: (request: RespondPermissionRequest) => typedError<null, RustacleError>(__TAURI_INVOKE("respond_permission", { request })),
+	// Get a setting value by key.
+	getSetting: (request: GetSettingRequest) => typedError<GetSettingResponse, RustacleError>(__TAURI_INVOKE("get_setting", { request })),
+	// Set a setting value by key. Emits `settings:changed` event on success.
+	setSetting: (request: SetSettingRequest) => typedError<null, RustacleError>(__TAURI_INVOKE("set_setting", { request })),
+	// Test a model connection by sending a minimal chat completion request.
+	testModelConnection: (request: TestModelRequest) => typedError<TestModelResponse, RustacleError>(__TAURI_INVOKE("test_model_connection", { request })),
 };
 
 /* Types */
@@ -41,6 +47,18 @@ export type AgentMode =
 "Plan" | 
 // No tools, direct Q&A.
 "Ask";
+
+// Request for `get_setting`.
+export type GetSettingRequest = {
+	key: string,
+};
+
+// Response from `get_setting`. Value is a JSON string.
+export type GetSettingResponse = {
+	key: string,
+	// JSON-encoded value string.
+	value_json: string,
+};
 
 // Response from `list_model_profiles`.
 export type ListModelProfilesResponse = {
@@ -129,6 +147,13 @@ export type SendPromptResponse = {
 	turn_id: string,
 };
 
+// Request for `set_setting`. Value is a JSON string.
+export type SetSettingRequest = {
+	key: string,
+	// JSON-encoded value string.
+	value_json: string,
+};
+
 // Input for `stop_turn`.
 export type StopTurnRequest = {
 	turn_id: string,
@@ -137,6 +162,21 @@ export type StopTurnRequest = {
 // Response from `stop_turn`.
 export type StopTurnResponse = {
 	cancelled: boolean,
+};
+
+// Request for `test_model_connection`.
+export type TestModelRequest = {
+	provider: string,
+	model: string,
+	api_base: string,
+	api_key: string,
+};
+
+// Response from `test_model_connection`.
+export type TestModelResponse = {
+	ok: boolean,
+	message: string,
+	latency_ms: number,
 };
 
 /* Tauri Specta runtime */

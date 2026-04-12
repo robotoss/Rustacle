@@ -9,6 +9,9 @@ use rustacle_ipc::commands::agent::{
 use rustacle_ipc::commands::plugins::{
     ListPluginsResponse, PluginCallRequest, PluginCallResponse, PluginState, PluginSummary,
 };
+use rustacle_ipc::commands::settings::{
+    GetSettingRequest, GetSettingResponse, SetSettingRequest, TestModelRequest, TestModelResponse,
+};
 use rustacle_ipc::commands::system::PingResponse;
 use rustacle_ipc::errors::RustacleError;
 use rustacle_ipc::events::agent::{
@@ -18,6 +21,7 @@ use rustacle_kernel::demo_plugin::DemoPlugin;
 use rustacle_kernel::{AgentSession, AppState, Kernel, PluginRegistry, lifecycle};
 use rustacle_plugin_api::RustacleModule;
 use rustacle_plugin_terminal::TerminalPlugin;
+use rustacle_settings::SettingKey;
 use tauri::Emitter;
 use tokio::sync::Mutex;
 use tracing::warn;
@@ -228,20 +232,190 @@ async fn stop_turn(
     }
 }
 
-/// List available model profiles from settings.
-#[allow(clippy::unnecessary_wraps)]
+/// List available model profiles from settings store.
 #[tauri::command]
 #[specta::specta]
-async fn list_model_profiles() -> Result<ListModelProfilesResponse, RustacleError> {
-    // TODO: Read from SettingsStore once it's wired into AppState.
-    // For now return an empty list — the UI will show "No profiles" placeholder.
-    Ok(ListModelProfilesResponse {
-        profiles: vec![ProfileSummary {
-            name: "default".to_string(),
-            provider: "none".to_string(),
-            model: "not configured".to_string(),
-        }],
+async fn list_model_profiles(
+    state: tauri::State<'_, AppState>,
+) -> Result<ListModelProfilesResponse, RustacleError> {
+    let profiles_json: Vec<serde_json::Value> = state
+        .settings
+        .get(SettingKey::ModelProfiles)
+        .map_err(|e| RustacleError::Internal {
+            message: e.to_string(),
+        })?;
+
+    let profiles = profiles_json
+        .iter()
+        .filter_map(|v| {
+            Some(ProfileSummary {
+                name: v.get("name")?.as_str()?.to_owned(),
+                provider: v.get("provider")?.as_str()?.to_owned(),
+                model: v.get("model")?.as_str()?.to_owned(),
+            })
+        })
+        .collect();
+
+    Ok(ListModelProfilesResponse { profiles })
+}
+
+/// Get a setting value by key.
+#[tauri::command]
+#[specta::specta]
+async fn get_setting(
+    state: tauri::State<'_, AppState>,
+    request: GetSettingRequest,
+) -> Result<GetSettingResponse, RustacleError> {
+    let key = SettingKey::from_key_str(&request.key).ok_or_else(|| RustacleError::NotFound {
+        resource: format!("setting key: {}", request.key),
+    })?;
+
+    let value = state
+        .settings
+        .get_json(key)
+        .map_err(|e| RustacleError::Internal {
+            message: e.to_string(),
+        })?;
+
+    let value_json = serde_json::to_string(&value).map_err(|e| RustacleError::Internal {
+        message: e.to_string(),
+    })?;
+
+    Ok(GetSettingResponse {
+        key: request.key,
+        value_json,
     })
+}
+
+/// Set a setting value by key. Emits `settings:changed` event on success.
+#[tauri::command]
+#[specta::specta]
+async fn set_setting(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    request: SetSettingRequest,
+) -> Result<(), RustacleError> {
+    let key = SettingKey::from_key_str(&request.key).ok_or_else(|| RustacleError::NotFound {
+        resource: format!("setting key: {}", request.key),
+    })?;
+
+    let value: serde_json::Value =
+        serde_json::from_str(&request.value_json).map_err(|e| RustacleError::InvalidInput {
+            field: "value_json".to_owned(),
+            message: e.to_string(),
+        })?;
+
+    state
+        .settings
+        .set_json(key, value)
+        .map_err(|e| RustacleError::Internal {
+            message: e.to_string(),
+        })?;
+
+    // Notify all frontend subscribers that a setting changed.
+    let _ = app.emit(
+        "settings:changed",
+        &serde_json::json!({ "key": request.key }),
+    );
+
+    Ok(())
+}
+
+/// Test a model connection by sending a minimal chat completion request.
+#[tauri::command]
+#[specta::specta]
+async fn test_model_connection(
+    request: TestModelRequest,
+) -> Result<TestModelResponse, RustacleError> {
+    let start = std::time::Instant::now();
+
+    let base = if request.api_base.is_empty() {
+        match request.provider.as_str() {
+            "openai" => "https://api.openai.com/v1".to_owned(),
+            "anthropic" => "https://api.anthropic.com".to_owned(),
+            _ => {
+                return Ok(TestModelResponse {
+                    ok: false,
+                    message: "No API base URL provided".to_owned(),
+                    latency_ms: 0,
+                });
+            }
+        }
+    } else {
+        request.api_base.trim_end_matches('/').to_owned()
+    };
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| RustacleError::Internal {
+            message: e.to_string(),
+        })?;
+
+    // Build request based on provider
+    let result = if request.provider == "anthropic" {
+        client
+            .post(format!("{base}/v1/messages"))
+            .header("x-api-key", &request.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .json(&serde_json::json!({
+                "model": request.model,
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "hi"}]
+            }))
+            .send()
+            .await
+    } else {
+        // OpenAI-compatible (works for local too)
+        let mut req = client
+            .post(format!("{base}/chat/completions"))
+            .header("content-type", "application/json")
+            .json(&serde_json::json!({
+                "model": request.model,
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "hi"}]
+            }));
+
+        if !request.api_key.is_empty() {
+            req = req.header("authorization", format!("Bearer {}", request.api_key));
+        }
+
+        req.send().await
+    };
+
+    #[allow(clippy::cast_possible_truncation)]
+    let latency_ms = start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
+
+    match result {
+        Ok(resp) => {
+            let status = resp.status();
+            if status.is_success() {
+                Ok(TestModelResponse {
+                    ok: true,
+                    message: format!("Connected ({status})"),
+                    latency_ms,
+                })
+            } else {
+                let body = resp.text().await.unwrap_or_default();
+                let msg = if body.len() > 200 {
+                    format!("{status}: {}...", &body[..200])
+                } else {
+                    format!("{status}: {body}")
+                };
+                Ok(TestModelResponse {
+                    ok: false,
+                    message: msg,
+                    latency_ms,
+                })
+            }
+        }
+        Err(e) => Ok(TestModelResponse {
+            ok: false,
+            message: e.to_string(),
+            latency_ms,
+        }),
+    }
 }
 
 /// Respond to a permission request from the agent.
@@ -273,6 +447,9 @@ pub fn specta_builder() -> tauri_specta::Builder {
         stop_turn,
         list_model_profiles,
         respond_permission,
+        get_setting,
+        set_setting,
+        test_model_connection,
     ])
 }
 
@@ -306,10 +483,22 @@ pub fn run() {
         (Arc::new(kernel), Arc::new(registry))
     });
 
+    // Open settings database in the app data directory.
+    let settings_path = dirs::data_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("rustacle")
+        .join("settings.db");
+    if let Some(parent) = settings_path.parent() {
+        std::fs::create_dir_all(parent).expect("failed to create settings directory");
+    }
+    let settings =
+        rustacle_settings::SettingsStore::open(&settings_path).expect("failed to open settings");
+
     let app_state = AppState {
         kernel: Arc::clone(&kernel),
         registry: Arc::clone(&registry),
         agent_session: Arc::new(Mutex::new(AgentSession::default())),
+        settings: Arc::new(settings),
     };
 
     tauri::Builder::default()

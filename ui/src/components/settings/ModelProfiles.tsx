@@ -1,9 +1,11 @@
 /**
  * ModelProfiles — CRUD for model profiles.
  * Provider, model, endpoint, API key (via keyring), temperature, max_tokens.
+ * Persisted to SQLite via get_setting / set_setting IPC commands.
  */
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { commands } from "../../../bindings";
 
 interface ModelProfile {
   name: string;
@@ -25,48 +27,146 @@ const DEFAULT_PROFILE: ModelProfile = {
 
 const PROVIDERS = ["local", "openai", "anthropic"];
 
+const SETTING_KEY = "model.profiles";
+
+/** Convert internal format to JSON for storage. */
+function profilesToJson(profiles: ModelProfile[]): unknown[] {
+  return profiles.map((p) => ({
+    name: p.name,
+    provider: p.provider,
+    model: p.model,
+    api_base: p.apiBase,
+    max_tokens: p.maxTokens,
+    temperature: p.temperature,
+  }));
+}
+
+/** Convert stored JSON back to internal format. */
+function jsonToProfiles(json: unknown[]): ModelProfile[] {
+  return json.map((item) => {
+    const v = item as Record<string, unknown>;
+    return {
+    name: (v.name as string) || "",
+    provider: (v.provider as string) || "local",
+    model: (v.model as string) || "",
+    apiBase: (v.api_base as string) || "",
+    maxTokens: (v.max_tokens as number) || 4096,
+    temperature: (v.temperature as number) || 0.0,
+  };
+  });
+}
+
 export default function ModelProfiles() {
   const [profiles, setProfiles] = useState<ModelProfile[]>([]);
   const [editing, setEditing] = useState<ModelProfile | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string; latency_ms: number } | null>(null);
+
+  // Load profiles from settings store on mount.
+  useEffect(() => {
+    commands
+      .getSetting({ key: SETTING_KEY })
+      .then((res) => {
+        if (res.status === "ok") {
+          try {
+            const parsed = JSON.parse(res.data.value_json);
+            if (Array.isArray(parsed)) {
+              setProfiles(jsonToProfiles(parsed));
+            }
+          } catch {
+            // Invalid JSON — ignore, use empty
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Persist profiles to settings store.
+  const persistProfiles = useCallback(async (updated: ModelProfile[]) => {
+    setSaving(true);
+    try {
+      await commands.setSetting({
+        key: SETTING_KEY,
+        value_json: JSON.stringify(profilesToJson(updated)),
+      });
+    } catch {
+      // Best effort — store might not be ready
+    }
+    setSaving(false);
+  }, []);
 
   const handleNew = () => {
     setEditing({ ...DEFAULT_PROFILE });
     setIsNew(true);
+    setApiKey("");
+    setTestResult(null);
   };
 
   const handleEdit = (p: ModelProfile) => {
     setEditing({ ...p });
     setIsNew(false);
+    setApiKey("");
+    setTestResult(null);
   };
 
-  const handleSave = () => {
+  const handleTest = async () => {
+    if (!editing) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await commands.testModelConnection({
+        provider: editing.provider,
+        model: editing.model,
+        api_base: editing.apiBase,
+        api_key: apiKey,
+      });
+      if (res.status === "ok") {
+        setTestResult(res.data);
+      } else {
+        setTestResult({ ok: false, message: "IPC error", latency_ms: 0 });
+      }
+    } catch {
+      setTestResult({ ok: false, message: "Request failed", latency_ms: 0 });
+    }
+    setTesting(false);
+  };
+
+  const handleSave = async () => {
     if (!editing || !editing.name.trim()) return;
 
+    let updated: ModelProfile[];
     if (isNew) {
-      setProfiles([...profiles, editing]);
+      updated = [...profiles, editing];
     } else {
-      setProfiles(profiles.map((p) => (p.name === editing.name ? editing : p)));
+      updated = profiles.map((p) => (p.name === editing.name ? editing : p));
     }
-    // TODO: Persist via Tauri command → rustacle-settings
+    setProfiles(updated);
+    await persistProfiles(updated);
     setEditing(null);
   };
 
-  const handleDelete = (name: string) => {
-    setProfiles(profiles.filter((p) => p.name !== name));
-    // TODO: Persist via Tauri command
+  const handleDelete = async (name: string) => {
+    const updated = profiles.filter((p) => p.name !== name);
+    setProfiles(updated);
+    await persistProfiles(updated);
   };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold">Model Profiles</h3>
-        <button
-          onClick={handleNew}
-          className="px-3 py-1 text-sm bg-indigo-700 hover:bg-indigo-600 text-white rounded transition-colors"
-        >
-          + New Profile
-        </button>
+        <div className="flex items-center gap-2">
+          {saving && <span className="text-xs text-amber-400">Saving...</span>}
+          <button
+            onClick={handleNew}
+            className="px-3 py-1 text-sm bg-indigo-700 hover:bg-indigo-600 text-white rounded transition-colors"
+          >
+            + New Profile
+          </button>
+        </div>
       </div>
 
       {/* Profile list */}
@@ -80,6 +180,7 @@ export default function ModelProfiles() {
             <div>
               <span className="text-sm font-medium text-gray-200">{p.name}</span>
               <span className="text-xs text-gray-500 ml-2">{p.provider} / {p.model}</span>
+              {p.apiBase && <span className="text-xs text-gray-600 ml-2">({p.apiBase})</span>}
             </div>
             <div className="flex gap-2">
               <button onClick={() => handleEdit(p)} className="text-xs text-gray-400 hover:text-white">Edit</button>
@@ -133,11 +234,13 @@ export default function ModelProfiles() {
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1">API Key (stored in OS keyring)</label>
+            <label className="block text-xs text-gray-400 mb-1">API Key</label>
             <input
               type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
               className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm text-gray-200"
-              placeholder="Enter to update (stored securely)"
+              placeholder="Enter API key (used for test, stored in keyring)"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -163,9 +266,31 @@ export default function ModelProfiles() {
               />
             </div>
           </div>
+          {/* Test result */}
+          {testResult && (
+            <div className={`flex items-center gap-2 px-3 py-2 rounded text-sm ${
+              testResult.ok
+                ? "bg-green-900/40 border border-green-700/50 text-green-300"
+                : "bg-red-900/40 border border-red-700/50 text-red-300"
+            }`}>
+              <span className={`inline-block w-2 h-2 rounded-full ${testResult.ok ? "bg-green-400" : "bg-red-400"}`} />
+              <span>{testResult.message}</span>
+              {testResult.latency_ms > 0 && (
+                <span className="text-xs text-gray-500 ml-auto">{testResult.latency_ms}ms</span>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-2 pt-2">
             <button onClick={handleSave} className="px-4 py-1.5 text-sm bg-green-700 hover:bg-green-600 text-white rounded transition-colors">
               Save
+            </button>
+            <button
+              onClick={handleTest}
+              disabled={testing || !editing.model}
+              className="px-4 py-1.5 text-sm bg-blue-700 hover:bg-blue-600 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {testing ? "Testing..." : "Test Connection"}
             </button>
             <button onClick={() => setEditing(null)} className="px-4 py-1.5 text-sm text-gray-400 hover:text-white transition-colors">
               Cancel

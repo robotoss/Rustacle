@@ -11,7 +11,7 @@ pub struct AppState {
     pub kernel: Arc<Kernel>,
     pub registry: Arc<PluginRegistry>,
     pub agent_session: Arc<Mutex<AgentSession>>,
-    // Future: settings, bus, llm, permission
+    pub settings: Arc<rustacle_settings::SettingsStore>,
 }
 
 /// Tracks the active agent turn and conversation history.

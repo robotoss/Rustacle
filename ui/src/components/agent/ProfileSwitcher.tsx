@@ -1,8 +1,10 @@
 /**
  * ProfileSwitcher — compact dropdown for switching model profiles on the fly.
+ * Reactively updates when settings change via `settings:changed` event.
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { commands, type ProfileSummary } from "../../../bindings";
 
 interface ProfileSwitcherProps {
@@ -13,7 +15,7 @@ interface ProfileSwitcherProps {
 export default function ProfileSwitcher({ currentProfile, onChange }: ProfileSwitcherProps) {
   const [profiles, setProfiles] = useState<ProfileSummary[]>([]);
 
-  useEffect(() => {
+  const loadProfiles = useCallback(() => {
     commands
       .listModelProfiles()
       .then((res) => {
@@ -21,10 +23,24 @@ export default function ProfileSwitcher({ currentProfile, onChange }: ProfileSwi
           setProfiles(res.data.profiles);
         }
       })
-      .catch(() => {
-        // Silently fail — profiles may not be available yet
-      });
+      .catch(() => {});
   }, []);
+
+  // Load on mount.
+  useEffect(() => {
+    loadProfiles();
+  }, [loadProfiles]);
+
+  // Reload when any setting changes (filter for model.profiles key).
+  useEffect(() => {
+    const unlisten = listen("settings:changed", (event) => {
+      const payload = event.payload as { key?: string };
+      if (!payload.key || payload.key === "model.profiles") {
+        loadProfiles();
+      }
+    });
+    return () => { unlisten.then((f) => f()); };
+  }, [loadProfiles]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
