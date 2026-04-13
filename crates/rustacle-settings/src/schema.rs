@@ -28,6 +28,9 @@ pub enum SettingKey {
     AgentMemoryTopK,
     /// Agent role: "developer" or "manager". Affects prompt tone.
     AgentRole,
+    /// Max context window tokens. When exceeded, history is compressed.
+    /// 0 means use model default.
+    AgentMaxContextTokens,
 
     // --- Terminal ---
     /// Default shell path.
@@ -63,6 +66,7 @@ impl SettingKey {
             Self::AgentFlushMs => "agent.flush_ms",
             Self::AgentMemoryTopK => "agent.memory_top_k",
             Self::AgentRole => "agent.role",
+            Self::AgentMaxContextTokens => "agent.max_context_tokens",
             Self::TerminalShell => "terminal.shell",
             Self::TerminalFontSize => "terminal.font_size",
             Self::TerminalFontFamily => "terminal.font_family",
@@ -85,6 +89,7 @@ impl SettingKey {
             Self::AgentFlushMs => serde_json::json!(80),
             Self::AgentMemoryTopK => serde_json::json!(6),
             Self::AgentRole => serde_json::json!("developer"),
+            Self::AgentMaxContextTokens => serde_json::json!(0),
             Self::TerminalShell => serde_json::json!(""),
             Self::TerminalFontSize => serde_json::json!(14),
             Self::TerminalFontFamily => serde_json::json!("monospace"),
@@ -107,6 +112,9 @@ impl SettingKey {
             Self::AgentMemoryTopK => "Number of memory entries in prompt",
             Self::AgentRole => {
                 "Agent role (developer/manager/blogger/analyst/devops/designer/student)"
+            }
+            Self::AgentMaxContextTokens => {
+                "Max context window tokens (0 = model default, history compressed when exceeded)"
             }
             Self::TerminalShell => "Default shell path (empty = auto-detect)",
             Self::TerminalFontSize => "Terminal font size in pixels",
@@ -134,6 +142,7 @@ impl SettingKey {
         Self::AgentFlushMs,
         Self::AgentMemoryTopK,
         Self::AgentRole,
+        Self::AgentMaxContextTokens,
         Self::TerminalShell,
         Self::TerminalFontSize,
         Self::TerminalFontFamily,

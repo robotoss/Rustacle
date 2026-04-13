@@ -3,8 +3,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use bytes::Bytes;
 use rustacle_ipc::commands::agent::{
-    AgentMode, ListModelProfilesResponse, ProfileSummary, RespondPermissionRequest,
-    SendPromptRequest, SendPromptResponse, StopTurnRequest, StopTurnResponse,
+    ListModelProfilesResponse, ProfileSummary, RespondPermissionRequest, SendPromptRequest,
+    SendPromptResponse, StopTurnRequest, StopTurnResponse,
 };
 use rustacle_ipc::commands::plugins::{
     ListPluginsResponse, PluginCallRequest, PluginCallResponse, PluginState, PluginSummary,
@@ -19,6 +19,9 @@ use rustacle_ipc::events::agent::{
 };
 use rustacle_kernel::demo_plugin::DemoPlugin;
 use rustacle_kernel::{AgentSession, AppState, Kernel, PluginRegistry, lifecycle};
+use rustacle_llm::provider::LlmProvider;
+use rustacle_llm::types::{ChatMessage as LlmChatMessage, ChatRequest, Role as LlmRole};
+use rustacle_llm_openai::OpenAiProvider;
 use rustacle_plugin_api::RustacleModule;
 use rustacle_plugin_terminal::TerminalPlugin;
 use rustacle_settings::SettingKey;
@@ -119,86 +122,50 @@ async fn send_prompt(
     }
 
     let turn_id_clone = turn_id.clone();
-    let mode = request.mode;
     let message = request.message.clone();
     let session = Arc::clone(&state.agent_session);
+    let settings = Arc::clone(&state.settings);
 
-    // Spawn the agent turn in the background.
-    // Placeholder: emits thought + answer. Real harness replaces this.
+    // Try to load model profile from settings for real LLM call.
+    let profile_name = request.model_profile.clone();
+
     tokio::spawn(async move {
         let start = std::time::Instant::now();
 
         // Give the frontend time to process START_TURN before emitting events.
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
-        // Check cancellation before each step.
         if cancel_token.is_cancelled() {
             emit_turn_end(&app, &turn_id_clone, &start);
             cleanup_session(&session, &turn_id_clone, &message, "Cancelled").await;
             return;
         }
 
-        let mode_label = match mode {
-            AgentMode::Chat => "Chat",
-            AgentMode::Plan => "Plan",
-            AgentMode::Ask => "Ask",
-        };
-
-        emit_reasoning(
+        // Try to find the model profile and call the real LLM.
+        let answer_text = match run_llm_turn(
             &app,
             &turn_id_clone,
-            IpcReasoningStep::Thought {
-                text: format!("[{mode_label} mode] Processing: {message}"),
-                partial: false,
-            },
-        );
-
-        // Simulate LLM processing time — cancellable.
-        tokio::select! {
-            () = tokio::time::sleep(std::time::Duration::from_millis(500)) => {}
-            () = cancel_token.cancelled() => {
-                emit_reasoning(&app, &turn_id_clone, IpcReasoningStep::Answer {
-                    text: "Cancelled by user.".to_owned(),
-                });
-                emit_turn_end(&app, &turn_id_clone, &start);
-                cleanup_session(&session, &turn_id_clone, &message, "Cancelled").await;
-                return;
+            &message,
+            profile_name.as_deref(),
+            &settings,
+            &cancel_token,
+        )
+        .await
+        {
+            Ok(text) => text,
+            Err(err_msg) => {
+                // LLM failed — emit the error as a thought, then a placeholder answer.
+                emit_reasoning(
+                    &app,
+                    &turn_id_clone,
+                    IpcReasoningStep::Error {
+                        message: err_msg.clone(),
+                        retryable: false,
+                    },
+                );
+                format!("LLM error: {err_msg}")
             }
-        }
-
-        let answer_text = match mode {
-            AgentMode::Ask => format!(
-                "This is the Ask mode placeholder response to: \"{message}\"\n\n\
-                 Once an LLM provider is configured in Settings, this will be replaced \
-                 with a real response."
-            ),
-            AgentMode::Plan => format!(
-                "**Plan mode** — here's a placeholder plan for: \"{message}\"\n\n\
-                 1. Analyze the request\n2. Identify affected files\n3. Propose changes\n\n\
-                 _Configure an LLM provider in Settings to get real plans._"
-            ),
-            AgentMode::Chat => format!(
-                "Placeholder response to: \"{message}\"\n\n\
-                 Configure an LLM provider in Settings -> Model Profiles to enable real agent interaction."
-            ),
         };
-
-        emit_reasoning(
-            &app,
-            &turn_id_clone,
-            IpcReasoningStep::Answer {
-                text: answer_text.clone(),
-            },
-        );
-
-        let _ = app.emit(
-            "agent:cost",
-            &CostSampleEvent {
-                turn_id: turn_id_clone.clone(),
-                input_tokens: 0,
-                output_tokens: 0,
-            },
-        );
 
         emit_turn_end(&app, &turn_id_clone, &start);
         cleanup_session(&session, &turn_id_clone, &message, &answer_text).await;
@@ -417,6 +384,212 @@ async fn respond_permission(_request: RespondPermissionRequest) -> Result<(), Ru
     // once permission flow is fully wired.
     warn!("respond_permission not yet connected to harness");
     Ok(())
+}
+
+/// Run a real LLM turn: load profile from settings, build request, stream response.
+/// Returns the full answer text on success, or an error message string on failure.
+#[allow(clippy::too_many_lines)]
+async fn run_llm_turn(
+    app: &tauri::AppHandle,
+    turn_id: &str,
+    message: &str,
+    profile_name: Option<&str>,
+    settings: &rustacle_settings::SettingsStore,
+    cancel: &tokio_util::sync::CancellationToken,
+) -> Result<String, String> {
+    use futures_util::StreamExt;
+
+    // Load model profiles from settings.
+    let profiles_json: Vec<serde_json::Value> = settings
+        .get(SettingKey::ModelProfiles)
+        .map_err(|e| format!("Failed to load profiles: {e}"))?;
+
+    let name = profile_name.unwrap_or("default");
+
+    let profile = profiles_json
+        .iter()
+        .find(|p| p.get("name").and_then(serde_json::Value::as_str) == Some(name))
+        .or_else(|| profiles_json.first())
+        .ok_or_else(|| {
+            "No model profiles configured. Go to Settings -> Model Profiles to add one.".to_owned()
+        })?;
+
+    let provider_str = profile
+        .get("provider")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("openai");
+    let model = profile
+        .get("model")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("")
+        .to_owned();
+    let api_base = profile
+        .get("api_base")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("")
+        .to_owned();
+    let api_key = profile
+        .get("api_key")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("")
+        .to_owned();
+    #[allow(clippy::cast_possible_truncation)]
+    let max_tokens = profile
+        .get("max_tokens")
+        .and_then(serde_json::Value::as_u64)
+        .map(|v| v as u32);
+    #[allow(clippy::cast_possible_truncation)]
+    let temperature = profile
+        .get("temperature")
+        .and_then(serde_json::Value::as_f64)
+        .map(|v| v as f32);
+
+    if model.is_empty() {
+        return Err("Model name is empty in profile. Edit the profile in Settings.".to_owned());
+    }
+
+    // Determine API base — use defaults for known providers.
+    let effective_base = if api_base.is_empty() {
+        match provider_str {
+            "openai" => "https://api.openai.com/v1".to_owned(),
+            "anthropic" => "https://api.anthropic.com/v1".to_owned(),
+            _ => {
+                return Err(
+                    "No API base URL set. For local models, set the endpoint URL.".to_owned(),
+                );
+            }
+        }
+    } else {
+        api_base
+    };
+
+    let key = if api_key.is_empty() {
+        None
+    } else {
+        Some(api_key)
+    };
+
+    // Build the provider (OpenAI-compatible for all providers for now).
+    let llm = OpenAiProvider::new(effective_base, key);
+
+    let chat_request = ChatRequest {
+        model,
+        messages: vec![
+            LlmChatMessage {
+                role: LlmRole::System,
+                content: "You are Rustacle, a helpful assistant. Be concise.".to_owned(),
+                tool_call_id: None,
+                name: None,
+            },
+            LlmChatMessage {
+                role: LlmRole::User,
+                content: message.to_owned(),
+                tool_call_id: None,
+                name: None,
+            },
+        ],
+        tools: Vec::new(),
+        max_tokens,
+        temperature,
+    };
+
+    emit_reasoning(
+        app,
+        turn_id,
+        IpcReasoningStep::Thought {
+            text: "Connecting to LLM...".to_owned(),
+            partial: true,
+        },
+    );
+
+    // Stream the response — cancellable.
+    let stream = tokio::select! {
+        r = llm.stream(chat_request, cancel.clone()) => {
+            r.map_err(|e| format!("LLM connection failed: {e}"))?
+        }
+        () = cancel.cancelled() => {
+            return Err("Cancelled".to_owned());
+        }
+    };
+
+    tokio::pin!(stream);
+
+    let mut full_text = String::new();
+    let mut input_tokens = 0u64;
+    let mut output_tokens = 0u64;
+
+    loop {
+        let delta = tokio::select! {
+            d = stream.next() => d,
+            () = cancel.cancelled() => {
+                if !full_text.is_empty() {
+                    emit_reasoning(app, turn_id, IpcReasoningStep::Answer {
+                        text: full_text.clone(),
+                    });
+                }
+                return Ok(full_text);
+            }
+        };
+
+        let Some(delta_result) = delta else { break };
+
+        match delta_result {
+            Ok(rustacle_llm::ChatDelta::Text { text }) => {
+                full_text.push_str(&text);
+                emit_reasoning(
+                    app,
+                    turn_id,
+                    IpcReasoningStep::Thought {
+                        text,
+                        partial: true,
+                    },
+                );
+            }
+            Ok(rustacle_llm::ChatDelta::Usage {
+                input_tokens: i,
+                output_tokens: o,
+            }) => {
+                input_tokens = i;
+                output_tokens = o;
+                let _ = app.emit(
+                    "agent:cost",
+                    &CostSampleEvent {
+                        turn_id: turn_id.to_owned(),
+                        input_tokens,
+                        output_tokens,
+                    },
+                );
+            }
+            Ok(rustacle_llm::ChatDelta::Done)
+            | Err(rustacle_llm::provider::LlmError::Cancelled) => break,
+            Ok(_) => {} // ToolUseStart etc — ignore for now
+            Err(e) => return Err(format!("Stream error: {e}")),
+        }
+    }
+
+    // Emit the final answer.
+    if full_text.is_empty() {
+        "(Empty response from LLM)".clone_into(&mut full_text);
+    }
+
+    emit_reasoning(
+        app,
+        turn_id,
+        IpcReasoningStep::Answer {
+            text: full_text.clone(),
+        },
+    );
+
+    let _ = app.emit(
+        "agent:cost",
+        &CostSampleEvent {
+            turn_id: turn_id.to_owned(),
+            input_tokens,
+            output_tokens,
+        },
+    );
+
+    Ok(full_text)
 }
 
 /// Emit a reasoning step event.
