@@ -78,12 +78,30 @@ export type AgentAction =
 export function agentReducer(state: AgentState, action: AgentAction): AgentState {
   switch (action.type) {
     case "ADD_STEP": {
-      const turns = state.turns.map((t) =>
-        t.turnId === action.step.turn_id
-          ? { ...t, steps: [...t.steps, action.step] }
-          : t
-      );
-      return { ...state, turns };
+      const turnExists = state.turns.some((t) => t.turnId === action.step.turn_id);
+      if (turnExists) {
+        const turns = state.turns.map((t) =>
+          t.turnId === action.step.turn_id
+            ? { ...t, steps: [...t.steps, action.step] }
+            : t
+        );
+        return { ...state, turns };
+      }
+      // Turn doesn't exist yet (event arrived before START_TURN) — create it.
+      const newTurn: ConversationTurn = {
+        turnId: action.step.turn_id,
+        userMessage: "",
+        mode: state.mode,
+        model: state.currentProfile ?? "default",
+        steps: [action.step],
+        startedAt: Date.now(),
+      };
+      return {
+        ...state,
+        activeTurnId: action.step.turn_id,
+        inputDisabled: true,
+        turns: [...state.turns, newTurn],
+      };
     }
 
     case "UPDATE_PARTIAL_THOUGHT": {
@@ -103,6 +121,16 @@ export function agentReducer(state: AgentState, action: AgentAction): AgentState
       return { ...state, cost: action.cost };
 
     case "START_TURN": {
+      // If turn already exists (created early by ADD_STEP), patch in user message.
+      const existing = state.turns.find((t) => t.turnId === action.turnId);
+      if (existing) {
+        const turns = state.turns.map((t) =>
+          t.turnId === action.turnId
+            ? { ...t, userMessage: action.userMessage, mode: action.mode, model: action.model }
+            : t
+        );
+        return { ...state, activeTurnId: action.turnId, inputDisabled: true, turns };
+      }
       const newTurn: ConversationTurn = {
         turnId: action.turnId,
         userMessage: action.userMessage,
