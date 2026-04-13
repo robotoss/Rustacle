@@ -78,15 +78,29 @@ export type AgentAction =
 export function agentReducer(state: AgentState, action: AgentAction): AgentState {
   switch (action.type) {
     case "ADD_STEP": {
-      const turnExists = state.turns.some((t) => t.turnId === action.step.turn_id);
-      if (turnExists) {
-        const turns = state.turns.map((t) =>
-          t.turnId === action.step.turn_id
-            ? { ...t, steps: [...t.steps, action.step] }
-            : t
+      const turnIdx = state.turns.findIndex((t) => t.turnId === action.step.turn_id);
+
+      if (turnIdx !== -1) {
+        // Turn exists — check if step already exists (streaming update by same ID).
+        const turn = state.turns[turnIdx];
+        const stepIdx = turn.steps.findIndex((s) => s.id === action.step.id);
+
+        let newSteps: ReasoningStep[];
+        if (stepIdx !== -1) {
+          // UPDATE existing step in place (streaming: same thought ID, new text).
+          newSteps = [...turn.steps];
+          newSteps[stepIdx] = action.step;
+        } else {
+          // APPEND new step.
+          newSteps = [...turn.steps, action.step];
+        }
+
+        const turns = state.turns.map((t, i) =>
+          i === turnIdx ? { ...t, steps: newSteps } : t
         );
         return { ...state, turns };
       }
+
       // Turn doesn't exist yet (event arrived before START_TURN) — create it.
       const newTurn: ConversationTurn = {
         turnId: action.step.turn_id,

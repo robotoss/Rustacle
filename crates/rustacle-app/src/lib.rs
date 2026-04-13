@@ -125,49 +125,59 @@ async fn send_prompt(
     let message = request.message.clone();
     let session = Arc::clone(&state.agent_session);
     let settings = Arc::clone(&state.settings);
-
-    // Try to load model profile from settings for real LLM call.
     let profile_name = request.model_profile.clone();
+
+    tracing::info!(turn_id = %turn_id, message_len = message.len(), "turn started");
 
     tokio::spawn(async move {
         let start = std::time::Instant::now();
 
-        // Give the frontend time to process START_TURN before emitting events.
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
         if cancel_token.is_cancelled() {
-            emit_turn_end(&app, &turn_id_clone, &start);
+            emit_turn_end(&app, &turn_id_clone, &start, 0, 0);
             cleanup_session(&session, &turn_id_clone, &message, "Cancelled").await;
             return;
         }
 
-        // Try to find the model profile and call the real LLM.
-        let answer_text = match run_llm_turn(
+        let result = run_llm_turn(
             &app,
             &turn_id_clone,
             &message,
             profile_name.as_deref(),
             &settings,
+            &session,
             &cancel_token,
         )
-        .await
-        {
-            Ok(text) => text,
+        .await;
+
+        let (answer_text, in_tok, out_tok) = match result {
+            Ok(r) => r,
             Err(err_msg) => {
-                // LLM failed — emit the error as a thought, then a placeholder answer.
-                emit_reasoning(
+                tracing::error!(turn_id = %turn_id_clone, error = %err_msg, "turn failed");
+                emit_reasoning_with_id(
                     &app,
                     &turn_id_clone,
+                    &ulid::Ulid::new().to_string(),
                     IpcReasoningStep::Error {
                         message: err_msg.clone(),
                         retryable: false,
                     },
                 );
-                format!("LLM error: {err_msg}")
+                (format!("LLM error: {err_msg}"), 0u64, 0u64)
             }
         };
 
-        emit_turn_end(&app, &turn_id_clone, &start);
+        #[allow(clippy::cast_possible_truncation)]
+        let duration_ms = start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
+        tracing::info!(
+            turn_id = %turn_id_clone,
+            chars = answer_text.len(),
+            input_tokens = in_tok,
+            output_tokens = out_tok,
+            duration_ms,
+            "turn complete"
+        );
+
+        emit_turn_end(&app, &turn_id_clone, &start, in_tok, out_tok);
         cleanup_session(&session, &turn_id_clone, &message, &answer_text).await;
     });
 
@@ -386,8 +396,7 @@ async fn respond_permission(_request: RespondPermissionRequest) -> Result<(), Ru
     Ok(())
 }
 
-/// Run a real LLM turn: load profile from settings, build request, stream response.
-/// Returns the full answer text on success, or an error message string on failure.
+/// Run a real LLM turn. Returns `(answer_text, input_tokens, output_tokens)`.
 #[allow(clippy::too_many_lines)]
 async fn run_llm_turn(
     app: &tauri::AppHandle,
@@ -395,30 +404,22 @@ async fn run_llm_turn(
     message: &str,
     profile_name: Option<&str>,
     settings: &rustacle_settings::SettingsStore,
+    session: &Arc<Mutex<rustacle_kernel::AgentSession>>,
     cancel: &tokio_util::sync::CancellationToken,
-) -> Result<String, String> {
+) -> Result<(String, u64, u64), String> {
     use futures_util::StreamExt;
 
-    // Load model profiles from settings.
+    // --- Load profile ---
     let profiles_json: Vec<serde_json::Value> = settings
         .get(SettingKey::ModelProfiles)
         .map_err(|e| format!("Failed to load profiles: {e}"))?;
 
     let name = profile_name.unwrap_or("default");
-
-    tracing::info!(
-        profile = name,
-        count = profiles_json.len(),
-        "loading model profile"
-    );
-
     let profile = profiles_json
         .iter()
         .find(|p| p.get("name").and_then(serde_json::Value::as_str) == Some(name))
         .or_else(|| profiles_json.first())
-        .ok_or_else(|| {
-            "No model profiles configured. Go to Settings -> Model Profiles to add one.".to_owned()
-        })?;
+        .ok_or("No model profiles configured. Go to Settings -> Model Profiles to add one.")?;
 
     let provider_str = profile
         .get("provider")
@@ -449,21 +450,21 @@ async fn run_llm_turn(
         .get("temperature")
         .and_then(serde_json::Value::as_f64)
         .map(|v| v as f32);
+    #[allow(clippy::cast_possible_truncation)]
+    let max_context: usize = profile
+        .get("max_context_tokens")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or(0) as usize;
 
     if model.is_empty() {
-        return Err("Model name is empty in profile. Edit the profile in Settings.".to_owned());
+        return Err("Model name is empty in profile.".to_owned());
     }
 
-    // Determine API base — use defaults for known providers.
     let effective_base = if api_base.is_empty() {
         match provider_str {
             "openai" => "https://api.openai.com/v1".to_owned(),
             "anthropic" => "https://api.anthropic.com/v1".to_owned(),
-            _ => {
-                return Err(
-                    "No API base URL set. For local models, set the endpoint URL.".to_owned(),
-                );
-            }
+            _ => return Err("No API base URL set.".to_owned()),
         }
     } else {
         api_base
@@ -475,64 +476,117 @@ async fn run_llm_turn(
         Some(api_key)
     };
 
-    tracing::info!(
-        provider = provider_str,
-        llm_model = %model,
-        base = %effective_base,
-        has_key = key.is_some(),
-        "connecting to LLM"
-    );
+    tracing::info!(provider = provider_str, llm_model = %model, base = %effective_base, "connecting to LLM");
 
-    // Build the provider (OpenAI-compatible for all providers for now).
     let llm = OpenAiProvider::new(effective_base, key);
+
+    // --- Build messages with history ---
+    let mut messages = vec![LlmChatMessage {
+        role: LlmRole::System,
+        content: "You are Rustacle, a helpful desktop assistant. Be concise and helpful."
+            .to_owned(),
+        tool_call_id: None,
+        name: None,
+    }];
+
+    // Add conversation history from previous turns.
+    {
+        let sess = session.lock().await;
+        let history = &sess.history;
+        let mut history_msgs: Vec<LlmChatMessage> = Vec::new();
+        for entry in history {
+            history_msgs.push(LlmChatMessage {
+                role: LlmRole::User,
+                content: entry.user_message.clone(),
+                tool_call_id: None,
+                name: None,
+            });
+            history_msgs.push(LlmChatMessage {
+                role: LlmRole::Assistant,
+                content: entry.assistant_answer.clone(),
+                tool_call_id: None,
+                name: None,
+            });
+        }
+
+        // Context compression: estimate tokens (chars/4), trim middle if over limit.
+        if max_context > 0 {
+            let total_chars: usize = history_msgs.iter().map(|m| m.content.len()).sum();
+            let est_tokens = total_chars / 4;
+            if est_tokens > max_context {
+                // Keep first turn + last N turns that fit.
+                let mut kept = Vec::new();
+                if history_msgs.len() >= 2 {
+                    kept.push(history_msgs[0].clone());
+                    kept.push(history_msgs[1].clone());
+                }
+                // Add from the end until budget is hit.
+                let budget_chars = max_context * 4;
+                let first_chars: usize = kept.iter().map(|m| m.content.len()).sum();
+                let mut remaining = budget_chars.saturating_sub(first_chars);
+                let mut tail = Vec::new();
+                for msg in history_msgs.iter().rev() {
+                    if msg.content.len() > remaining {
+                        break;
+                    }
+                    remaining -= msg.content.len();
+                    tail.push(msg.clone());
+                }
+                tail.reverse();
+                if tail.len() < history_msgs.len().saturating_sub(2) {
+                    kept.push(LlmChatMessage {
+                        role: LlmRole::System,
+                        content: format!(
+                            "[{} earlier messages compressed]",
+                            history_msgs.len() - 2 - tail.len()
+                        ),
+                        tool_call_id: None,
+                        name: None,
+                    });
+                }
+                kept.extend(tail);
+                history_msgs = kept;
+                tracing::info!(
+                    original = history.len(),
+                    kept = history_msgs.len() / 2,
+                    "context compressed"
+                );
+            }
+        }
+
+        messages.extend(history_msgs);
+    }
+
+    // Current user message.
+    messages.push(LlmChatMessage {
+        role: LlmRole::User,
+        content: message.to_owned(),
+        tool_call_id: None,
+        name: None,
+    });
+
+    tracing::info!(message_count = messages.len(), "sending to LLM");
 
     let chat_request = ChatRequest {
         model,
-        messages: vec![
-            LlmChatMessage {
-                role: LlmRole::System,
-                content: "You are Rustacle, a helpful assistant. Be concise.".to_owned(),
-                tool_call_id: None,
-                name: None,
-            },
-            LlmChatMessage {
-                role: LlmRole::User,
-                content: message.to_owned(),
-                tool_call_id: None,
-                name: None,
-            },
-        ],
+        messages,
         tools: Vec::new(),
         max_tokens,
         temperature,
     };
 
-    emit_reasoning(
-        app,
-        turn_id,
-        IpcReasoningStep::Thought {
-            text: "Connecting to LLM...".to_owned(),
-            partial: true,
-        },
-    );
+    // --- Stream response ---
+    // Use a SINGLE step ID for the streaming thought so the UI updates in place.
+    let thought_step_id = ulid::Ulid::new().to_string();
 
-    // Stream the response — cancellable.
     let stream = tokio::select! {
         r = llm.stream(chat_request, cancel.clone()) => {
             match r {
-                Ok(s) => {
-                    tracing::info!("LLM stream connected");
-                    s
-                }
-                Err(e) => {
-                    tracing::error!(error = %e, "LLM stream failed");
-                    return Err(format!("LLM connection failed: {e}"));
-                }
+                Ok(s) => { tracing::info!("LLM stream connected"); s }
+                Err(e) => { tracing::error!(error = %e, "LLM stream failed"); return Err(format!("LLM connection failed: {e}")); }
             }
         }
-        () = cancel.cancelled() => {
-            return Err("Cancelled".to_owned());
-        }
+        () = cancel.cancelled() => { return Err("Cancelled".to_owned()); }
     };
 
     tokio::pin!(stream);
@@ -540,18 +594,12 @@ async fn run_llm_turn(
     let mut full_text = String::new();
     let mut input_tokens = 0u64;
     let mut output_tokens = 0u64;
+    let mut chunk_count = 0u32;
 
     loop {
         let delta = tokio::select! {
             d = stream.next() => d,
-            () = cancel.cancelled() => {
-                if !full_text.is_empty() {
-                    emit_reasoning(app, turn_id, IpcReasoningStep::Answer {
-                        text: full_text.clone(),
-                    });
-                }
-                return Ok(full_text);
-            }
+            () = cancel.cancelled() => { break; }
         };
 
         let Some(delta_result) = delta else { break };
@@ -559,11 +607,14 @@ async fn run_llm_turn(
         match delta_result {
             Ok(rustacle_llm::ChatDelta::Text { text }) => {
                 full_text.push_str(&text);
-                emit_reasoning(
+                chunk_count += 1;
+                // Emit the SAME step ID with accumulated text — UI updates in place.
+                emit_reasoning_with_id(
                     app,
                     turn_id,
+                    &thought_step_id,
                     IpcReasoningStep::Thought {
-                        text,
+                        text: full_text.clone(),
                         partial: true,
                     },
                 );
@@ -585,31 +636,26 @@ async fn run_llm_turn(
             }
             Ok(rustacle_llm::ChatDelta::Done)
             | Err(rustacle_llm::provider::LlmError::Cancelled) => break,
-            Ok(_) => {} // ToolUseStart etc — ignore for now
+            Ok(_) => {}
             Err(e) => return Err(format!("Stream error: {e}")),
         }
     }
 
-    tracing::info!(
-        chars = full_text.len(),
-        input_tokens,
-        output_tokens,
-        "LLM turn complete"
-    );
-
-    // Emit the final answer.
     if full_text.is_empty() {
         "(Empty response from LLM)".clone_into(&mut full_text);
     }
 
-    emit_reasoning(
+    // Emit final answer as a separate step.
+    emit_reasoning_with_id(
         app,
         turn_id,
+        &ulid::Ulid::new().to_string(),
         IpcReasoningStep::Answer {
             text: full_text.clone(),
         },
     );
 
+    // Final cost.
     let _ = app.emit(
         "agent:cost",
         &CostSampleEvent {
@@ -619,13 +665,26 @@ async fn run_llm_turn(
         },
     );
 
-    Ok(full_text)
+    tracing::info!(
+        chunks = chunk_count,
+        chars = full_text.len(),
+        input_tokens,
+        output_tokens,
+        "stream complete"
+    );
+
+    Ok((full_text, input_tokens, output_tokens))
 }
 
-/// Emit a reasoning step event.
-fn emit_reasoning(app: &tauri::AppHandle, turn_id: &str, step: IpcReasoningStep) {
+/// Emit a reasoning step event with a specific step ID (for streaming updates).
+fn emit_reasoning_with_id(
+    app: &tauri::AppHandle,
+    turn_id: &str,
+    step_id: &str,
+    step: IpcReasoningStep,
+) {
     let event = ReasoningStepEvent {
-        id: ulid::Ulid::new().to_string(),
+        id: step_id.to_owned(),
         parent_id: None,
         turn_id: turn_id.to_owned(),
         ts_ms: now_ms(),
@@ -634,8 +693,14 @@ fn emit_reasoning(app: &tauri::AppHandle, turn_id: &str, step: IpcReasoningStep)
     let _ = app.emit("agent:reasoning", &event);
 }
 
-/// Emit a `turn_end` event.
-fn emit_turn_end(app: &tauri::AppHandle, turn_id: &str, start: &std::time::Instant) {
+/// Emit a `turn_end` event with actual token counts.
+fn emit_turn_end(
+    app: &tauri::AppHandle,
+    turn_id: &str,
+    start: &std::time::Instant,
+    input_tokens: u64,
+    output_tokens: u64,
+) {
     #[allow(clippy::cast_possible_truncation)]
     let duration_ms = start.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
     let _ = app.emit(
@@ -643,8 +708,8 @@ fn emit_turn_end(app: &tauri::AppHandle, turn_id: &str, start: &std::time::Insta
         &TurnEndEvent {
             turn_id: turn_id.to_owned(),
             duration_ms,
-            input_tokens: 0,
-            output_tokens: 0,
+            input_tokens,
+            output_tokens,
             tool_calls: 0,
         },
     );
