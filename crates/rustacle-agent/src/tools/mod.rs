@@ -15,6 +15,8 @@ pub mod sub_agent;
 
 pub use registry::ToolDispatchTable;
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use serde_json::Value;
 use tokio_util::sync::CancellationToken;
@@ -64,10 +66,28 @@ pub enum ToolError {
     Cancelled,
 }
 
+/// Bridge for calling other plugins from within a tool (e.g., bash -> terminal).
+///
+/// Implemented in `rustacle-app` where the plugin registry is available.
+#[async_trait]
+pub trait PluginBridge: Send + Sync {
+    /// Call a plugin command and return the response bytes.
+    async fn plugin_call(
+        &self,
+        plugin_id: &str,
+        command: &str,
+        payload: bytes::Bytes,
+    ) -> Result<bytes::Bytes, ToolError>;
+}
+
 /// Context passed to a tool during execution.
 pub struct ToolCtx {
     pub cancel: CancellationToken,
     pub cwd: std::path::PathBuf,
+    /// Target terminal tab for commands like `bash`. `None` = active tab.
+    pub tab_target: Option<String>,
+    /// Bridge for calling other plugins (e.g., terminal plugin).
+    pub plugin_bridge: Option<Arc<dyn PluginBridge>>,
 }
 
 /// The tool trait. Every stock and user-defined tool implements this.

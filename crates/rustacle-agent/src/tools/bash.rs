@@ -29,6 +29,72 @@ const BLOCKED_PATTERNS: &[&str] = &[
 /// Execute a shell command.
 pub struct BashTool;
 
+impl BashTool {
+    /// Execute a command via the terminal plugin, targeting a specific tab.
+    async fn call_via_terminal(
+        &self,
+        bridge: &dyn super::PluginBridge,
+        tab_id: &str,
+        command: &str,
+        _timeout_ms: u64,
+        ctx: &ToolCtx,
+    ) -> Result<ToolOutput, ToolError> {
+        let start = std::time::Instant::now();
+
+        // Write command + newline to the tab's PTY.
+        let write_payload = serde_json::json!({
+            "tab_id": tab_id,
+            "data": format!("{command}\n"),
+        });
+        bridge
+            .plugin_call(
+                "rustacle.terminal",
+                "write",
+                bytes::Bytes::from(
+                    serde_json::to_vec(&write_payload).map_err(|e| {
+                        ToolError::Execution(format!("serialize write request: {e}"))
+                    })?,
+                ),
+            )
+            .await?;
+
+        // Brief wait for output, then read.
+        tokio::select! {
+            () = tokio::time::sleep(std::time::Duration::from_millis(500)) => {}
+            () = ctx.cancel.cancelled() => {
+                return Err(ToolError::Cancelled);
+            }
+        }
+
+        let read_payload = serde_json::json!({ "tab_id": tab_id });
+        let output_bytes =
+            bridge
+                .plugin_call(
+                    "rustacle.terminal",
+                    "read",
+                    bytes::Bytes::from(serde_json::to_vec(&read_payload).map_err(|e| {
+                        ToolError::Execution(format!("serialize read request: {e}"))
+                    })?),
+                )
+                .await?;
+
+        let elapsed = start.elapsed();
+        let output_str = String::from_utf8_lossy(&output_bytes);
+        let total_bytes = output_str.len();
+
+        let summary = format!(
+            "tab {tab_id}: sent in {:.1}s, {} bytes output",
+            elapsed.as_secs_f64(),
+            total_bytes
+        );
+
+        Ok(ToolOutput {
+            summary,
+            payload: Some(output_bytes),
+        })
+    }
+}
+
 #[async_trait]
 impl Tool for BashTool {
     fn schema(&self) -> ToolSchema {
@@ -112,8 +178,22 @@ impl Tool for BashTool {
             .and_then(Value::as_u64)
             .unwrap_or(120_000);
 
-        // In the full system, this delegates to the terminal plugin via
-        // a kernel-mediated command. For now, we execute directly.
+        // Determine target tab: explicit from ctx, from args, or None (active).
+        let tab_target = ctx.tab_target.clone().or_else(|| {
+            args.get("tab_target")
+                .and_then(Value::as_str)
+                .map(String::from)
+        });
+
+        // If we have a plugin bridge and a tab target, route through the
+        // terminal plugin for tab-targeted execution.
+        if let (Some(bridge), Some(tab_id)) = (&ctx.plugin_bridge, &tab_target) {
+            return self
+                .call_via_terminal(bridge.as_ref(), tab_id, command, timeout_ms, &ctx)
+                .await;
+        }
+
+        // Direct execution (fallback when no bridge or no target tab).
         let start = std::time::Instant::now();
 
         let output = tokio::select! {

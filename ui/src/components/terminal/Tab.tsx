@@ -1,126 +1,165 @@
-import { useEffect, useRef, useState } from "react";
-import { Terminal } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import { WebglAddon } from "@xterm/addon-webgl";
+import { useCallback, useEffect, useMemo, useReducer } from "react";
 import "@xterm/xterm/css/xterm.css";
 import { useTerminal } from "./useTerminal";
+import { initialTerminalState, terminalReducer } from "../../state/terminal";
+import TabBar from "./TabBar";
+import SplitTree from "./SplitTree";
+import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 
-/** Dark theme matching Rustacle's color scheme. */
-const THEME = {
-  background: "#1a1a2e",
-  foreground: "#e0e0e0",
-  cursor: "#e0e0e0",
-  cursorAccent: "#1a1a2e",
-  selectionBackground: "#3a3a5e",
-  black: "#1a1a2e",
-  red: "#f87171",
-  green: "#4ade80",
-  yellow: "#facc15",
-  blue: "#60a5fa",
-  magenta: "#c084fc",
-  cyan: "#22d3ee",
-  white: "#e0e0e0",
-};
+/**
+ * Top-level terminal view. Manages tab state, split layout, and keyboard
+ * shortcuts. Renders a TabBar + recursive SplitTree.
+ */
+export default function TerminalTab() {
+  const [state, dispatch] = useReducer(terminalReducer, initialTerminalState);
+  const {
+    openTab,
+    closeTab,
+    listTabs,
+    splitTab,
+    getLayout,
+    resizeSplit,
+    reorderTab,
+    setActiveTab,
+    setTabTitle,
+  } = useTerminal();
 
-interface TabProps {
-  onTitle?: (title: string) => void;
-}
+  // Sync layout from backend.
+  const refreshLayout = useCallback(async () => {
+    const layout = await getLayout();
+    dispatch({ type: "UPDATE_LAYOUT", layout });
+  }, [getLayout]);
 
-export default function TerminalTab({ onTitle }: TabProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const termRef = useRef<Terminal | null>(null);
-  const fitRef = useRef<FitAddon | null>(null);
-  const tabIdRef = useRef<string | null>(null);
-  const pollRef = useRef<number | null>(null);
-  const { openTab, writePty, readPty, resizePty } = useTerminal();
-  const [ready, setReady] = useState(false);
+  // Sync tabs from backend.
+  const refreshTabs = useCallback(async () => {
+    const tabs = await listTabs();
+    dispatch({ type: "SET_TABS", tabs });
+  }, [listTabs]);
 
+  const refresh = useCallback(async () => {
+    await Promise.all([refreshTabs(), refreshLayout()]);
+  }, [refreshTabs, refreshLayout]);
+
+  // Open first tab on mount.
   useEffect(() => {
-    if (!containerRef.current) return;
-
-    const term = new Terminal({
-      cursorBlink: true,
-      fontSize: 14,
-      fontFamily: "'Cascadia Code', 'Fira Code', monospace",
-      theme: THEME,
-      scrollback: 100_000,
-    });
-
-    const fit = new FitAddon();
-    term.loadAddon(fit);
-
-    term.open(containerRef.current);
-
-    // Try WebGL, fall back to canvas
-    try {
-      const webgl = new WebglAddon();
-      term.loadAddon(webgl);
-    } catch {
-      console.warn("WebGL addon failed, using canvas renderer");
-    }
-
-    fit.fit();
-    termRef.current = term;
-    fitRef.current = fit;
-
-    // Spawn PTY
-    openTab().then((res) => {
-      tabIdRef.current = res.tab_id;
-      setReady(true);
-
-      // Resize PTY to match terminal size
-      resizePty(res.tab_id, term.cols, term.rows);
-
-      // Poll for PTY output (event-based streaming comes later)
-      const poll = window.setInterval(async () => {
-        if (!tabIdRef.current) return;
-        try {
-          const data = await readPty(tabIdRef.current);
-          if (data.length > 0) {
-            term.write(data);
-          }
-        } catch {
-          // Tab may have closed
-        }
-      }, 50);
-      pollRef.current = poll;
-    });
-
-    // Send keystrokes to PTY
-    term.onData((data) => {
-      if (tabIdRef.current) {
-        writePty(tabIdRef.current, data);
-      }
-    });
-
-    // Handle resize
-    const resizeObserver = new ResizeObserver(() => {
-      fit.fit();
-      if (tabIdRef.current) {
-        resizePty(tabIdRef.current, term.cols, term.rows);
-      }
-    });
-    resizeObserver.observe(containerRef.current);
-
-    // Title changes
-    term.onTitleChange((title) => {
-      onTitle?.(title);
-    });
-
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-      resizeObserver.disconnect();
-      term.dispose();
-    };
+    openTab().then(() => refresh());
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Actions ──────────────────────────────────────────────────────
+
+  const handleNewTab = useCallback(async () => {
+    await openTab();
+    await refresh();
+  }, [openTab, refresh]);
+
+  const handleCloseTab = useCallback(
+    async (tabId: string) => {
+      await closeTab(tabId);
+      await refresh();
+    },
+    [closeTab, refresh]
+  );
+
+  const handleSelect = useCallback(
+    async (tabId: string) => {
+      await setActiveTab(tabId);
+      dispatch({ type: "SET_ACTIVE", tabId });
+    },
+    [setActiveTab]
+  );
+
+  const handleReorder = useCallback(
+    async (tabId: string, newIndex: number) => {
+      await reorderTab(tabId, newIndex);
+      dispatch({ type: "REORDER", tabId, newIndex });
+    },
+    [reorderTab]
+  );
+
+  const handleSplitH = useCallback(async () => {
+    if (!state.activeTabId) return;
+    await splitTab(state.activeTabId, "horizontal");
+    await refresh();
+  }, [state.activeTabId, splitTab, refresh]);
+
+  const handleSplitV = useCallback(async () => {
+    if (!state.activeTabId) return;
+    await splitTab(state.activeTabId, "vertical");
+    await refresh();
+  }, [state.activeTabId, splitTab, refresh]);
+
+  const handleResizeSplit = useCallback(
+    async (nodeId: string, ratio: number) => {
+      await resizeSplit(nodeId, ratio);
+      await refreshLayout();
+    },
+    [resizeSplit, refreshLayout]
+  );
+
+  const handleFocusTab = useCallback(
+    (tabId: string) => {
+      setActiveTab(tabId);
+      dispatch({ type: "SET_ACTIVE", tabId });
+    },
+    [setActiveTab]
+  );
+
+  const handleTitle = useCallback(
+    (tabId: string, title: string) => {
+      setTabTitle(tabId, title);
+      dispatch({ type: "SET_TAB_TITLE", tabId, title });
+    },
+    [setTabTitle]
+  );
+
+  const handleJumpToTab = useCallback(
+    (index: number) => {
+      const tab = state.tabs[index];
+      if (tab) handleSelect(tab.id);
+    },
+    [state.tabs, handleSelect]
+  );
+
+  const handleCloseActive = useCallback(() => {
+    if (state.activeTabId) handleCloseTab(state.activeTabId);
+  }, [state.activeTabId, handleCloseTab]);
+
+  // ── Keyboard shortcuts ───────────────────────────────────────────
+
+  const shortcuts = useMemo(
+    () => ({
+      newTab: handleNewTab,
+      closeTab: handleCloseActive,
+      splitHorizontal: handleSplitH,
+      splitVertical: handleSplitV,
+      jumpToTab: handleJumpToTab,
+    }),
+    [handleNewTab, handleCloseActive, handleSplitH, handleSplitV, handleJumpToTab]
+  );
+
+  useKeyboardShortcuts(shortcuts);
+
+  // ── Render ───────────────────────────────────────────────────────
 
   return (
     <div className="flex flex-col h-full">
-      <div className="bg-gray-800 px-3 py-1 text-xs text-gray-400 border-b border-gray-700 flex items-center gap-2">
-        <span className="text-green-400">●</span>
-        <span>{ready ? `Terminal (${tabIdRef.current})` : "Connecting..."}</span>
+      <TabBar
+        tabs={state.tabs}
+        activeTabId={state.activeTabId}
+        onSelect={handleSelect}
+        onClose={handleCloseTab}
+        onNew={handleNewTab}
+        onReorder={handleReorder}
+      />
+      <div className="flex-1 overflow-hidden">
+        <SplitTree
+          layout={state.layout}
+          activeTabId={state.activeTabId}
+          onFocusTab={handleFocusTab}
+          onTitle={handleTitle}
+          onResizeSplit={handleResizeSplit}
+        />
       </div>
-      <div ref={containerRef} className="flex-1 bg-[#1a1a2e]" />
     </div>
   );
 }

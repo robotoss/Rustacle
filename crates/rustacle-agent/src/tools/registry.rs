@@ -7,13 +7,15 @@ use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 
-use super::{Concurrency, Tool, ToolCtx, ToolError, placeholder_dispatch};
+use super::{Concurrency, PluginBridge, Tool, ToolCtx, ToolError, placeholder_dispatch};
 
 /// Registry of all available tools, keyed by name (sorted for determinism).
 pub struct ToolDispatchTable {
     by_name: BTreeMap<String, Arc<dyn Tool>>,
     /// Working directory for tool execution.
     cwd: std::path::PathBuf,
+    /// Bridge for calling other plugins from tools.
+    plugin_bridge: Option<Arc<dyn PluginBridge>>,
 }
 
 impl ToolDispatchTable {
@@ -23,7 +25,15 @@ impl ToolDispatchTable {
         Self {
             by_name: BTreeMap::new(),
             cwd,
+            plugin_bridge: None,
         }
+    }
+
+    /// Set the plugin bridge for tool→plugin communication.
+    #[must_use]
+    pub fn with_plugin_bridge(mut self, bridge: Arc<dyn PluginBridge>) -> Self {
+        self.plugin_bridge = Some(bridge);
+        self
     }
 
     /// Register a tool.
@@ -69,6 +79,8 @@ impl ToolDispatchTable {
         let ctx = ToolCtx {
             cancel: cancel.clone(),
             cwd: self.cwd.clone(),
+            tab_target: None,
+            plugin_bridge: self.plugin_bridge.clone(),
         };
 
         // Execute with cancellation
@@ -107,6 +119,7 @@ impl ToolDispatchTable {
                 let tool = self.by_name.get(&name).cloned();
                 let child_cancel = parent_cancel.child_token();
                 let cwd = self.cwd.clone();
+                let bridge = self.plugin_bridge.clone();
 
                 set.spawn(async move {
                     let Some(tool) = tool else {
@@ -120,6 +133,8 @@ impl ToolDispatchTable {
                     let ctx = ToolCtx {
                         cancel: child_cancel.clone(),
                         cwd,
+                        tab_target: None,
+                        plugin_bridge: bridge,
                     };
 
                     let result = tokio::select! {

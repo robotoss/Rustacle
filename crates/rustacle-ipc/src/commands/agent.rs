@@ -67,3 +67,11 @@ pub struct ProfileSummary {
 pub struct ListModelProfilesResponse {
     pub profiles: Vec<ProfileSummary>,
 }
+
+/// Request to reroute a pending tool call to a different tab.
+#[derive(Debug, Clone, Serialize, Deserialize, specta::Type)]
+pub struct RerouteToolCallRequest {
+    pub turn_id: String,
+    pub step_id: String,
+    pub new_tab_id: String,
+}

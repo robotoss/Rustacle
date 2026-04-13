@@ -73,7 +73,8 @@ export type AgentAction =
   | { type: "SET_MODE"; mode: AgentMode }
   | { type: "SET_PROFILE"; profile: string }
   | { type: "REPLACE_TURN_ID"; oldId: string; newId: string }
-  | { type: "CLEAR_CONVERSATION" };
+  | { type: "CLEAR_CONVERSATION" }
+  | { type: "REROUTE_TOOL_CALL"; stepId: string; newTabTarget: number };
 
 export function agentReducer(state: AgentState, action: AgentAction): AgentState {
   switch (action.type) {
@@ -199,5 +200,18 @@ export function agentReducer(state: AgentState, action: AgentAction): AgentState
 
     case "CLEAR_CONVERSATION":
       return { ...state, turns: [], cost: { turn_id: "", input_tokens: 0, output_tokens: 0 } };
+
+    case "REROUTE_TOOL_CALL": {
+      const turns = state.turns.map((t) => {
+        if (t.turnId !== state.activeTurnId) return t;
+        const steps = t.steps.map((s) =>
+          s.id === action.stepId && s.step.kind === "ToolCall"
+            ? { ...s, step: { ...s.step, data: { ...s.step.data, tab_target: action.newTabTarget } } as StepKind }
+            : s
+        );
+        return { ...t, steps };
+      });
+      return { ...state, turns };
+    }
   }
 }

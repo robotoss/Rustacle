@@ -145,12 +145,18 @@ impl Harness {
                 let args: serde_json::Value =
                     serde_json::from_str(&call.args_json).unwrap_or_default();
 
+                #[allow(clippy::cast_possible_truncation)]
+                let tab_target = args
+                    .get("tab_target")
+                    .and_then(serde_json::Value::as_u64)
+                    .map(|v| v as usize);
+
                 self.emit_step(
                     &turn_id,
                     StepKind::ToolCall {
                         tool: call.name.clone(),
                         args: args.clone(),
-                        tab_target: None,
+                        tab_target,
                     },
                 );
 
