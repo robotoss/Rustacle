@@ -683,6 +683,12 @@ fn emit_reasoning_with_id(
     step_id: &str,
     step: IpcReasoningStep,
 ) {
+    let step_type = match &step {
+        IpcReasoningStep::Thought { text, .. } => format!("Thought({}chars)", text.len()),
+        IpcReasoningStep::Answer { text } => format!("Answer({}chars)", text.len()),
+        IpcReasoningStep::Error { message, .. } => format!("Error({message})"),
+        _ => "Other".to_owned(),
+    };
     let event = ReasoningStepEvent {
         id: step_id.to_owned(),
         parent_id: None,
@@ -690,7 +696,10 @@ fn emit_reasoning_with_id(
         ts_ms: now_ms(),
         step,
     };
-    let _ = app.emit("agent:reasoning", &event);
+    match app.emit("agent:reasoning", &event) {
+        Ok(()) => tracing::debug!(step_id = %step_id, step_type = %step_type, "event emitted OK"),
+        Err(e) => tracing::error!(step_id = %step_id, error = %e, "event emit FAILED"),
+    }
 }
 
 /// Emit a `turn_end` event with actual token counts.

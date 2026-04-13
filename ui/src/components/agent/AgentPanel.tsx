@@ -84,13 +84,20 @@ export default function AgentPanel() {
 
     unlisteners.push(
       listen("agent:reasoning", (event) => {
-        const step = mapEventToStep(event.payload as Parameters<typeof mapEventToStep>[0]);
-        dispatch({ type: "ADD_STEP", step });
+        console.log("[agent:reasoning] raw payload:", JSON.stringify(event.payload).slice(0, 500));
+        try {
+          const step = mapEventToStep(event.payload as Parameters<typeof mapEventToStep>[0]);
+          console.log("[agent:reasoning] mapped step:", step.id, step.step.kind, "turn:", step.turn_id);
+          dispatch({ type: "ADD_STEP", step });
+        } catch (e) {
+          console.error("[agent:reasoning] mapEventToStep FAILED:", e, "payload:", event.payload);
+        }
       })
     );
 
     unlisteners.push(
       listen("agent:cost", (event) => {
+        console.log("[agent:cost]", event.payload);
         const payload = event.payload as { turn_id: string; input_tokens: number; output_tokens: number };
         dispatch({ type: "UPDATE_COST", cost: payload });
       })
@@ -98,6 +105,7 @@ export default function AgentPanel() {
 
     unlisteners.push(
       listen("agent:turn_end", (event) => {
+        console.log("[agent:turn_end]", event.payload);
         const payload = event.payload as {
           turn_id: string;
           duration_ms: number;
@@ -159,14 +167,16 @@ export default function AgentPanel() {
       const mode = state.mode;
 
       try {
-        // Get turn_id from backend FIRST, then create the turn in UI
+        console.log("[handleSend] sending:", message, "profile:", state.currentProfile, "mode:", mode);
         const result = await commands.sendPrompt({
           message,
           model_profile: state.currentProfile,
           mode: mode as "Chat" | "Plan" | "Ask",
         });
+        console.log("[handleSend] result:", JSON.stringify(result));
 
         if (result.status === "ok") {
+          console.log("[handleSend] START_TURN with turn_id:", result.data.turn_id);
           dispatch({
             type: "START_TURN",
             turnId: result.data.turn_id,
@@ -174,6 +184,8 @@ export default function AgentPanel() {
             mode,
             model,
           });
+        } else {
+          console.error("[handleSend] sendPrompt failed:", result);
         }
       } catch {
         // Failed to send — don't lock the input
@@ -254,6 +266,12 @@ export default function AgentPanel() {
 
       {/* Cost badge */}
       <CostBadge cost={state.cost} active={state.activeTurnId !== null} />
+
+      {/* Debug: state summary */}
+      <div className="text-xs text-gray-700 px-3 py-1 bg-gray-950 font-mono">
+        turns={state.turns.length} active={state.activeTurnId ?? "null"} disabled={String(state.inputDisabled)}
+        {state.turns.map((t) => ` | ${t.turnId.slice(-6)}: steps=${t.steps.length}`).join("")}
+      </div>
 
       {/* Conversation history */}
       <div
