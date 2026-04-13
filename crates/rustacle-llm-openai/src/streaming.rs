@@ -22,6 +22,8 @@ pub async fn stream_openai(
         retryable: false,
     })?;
     body["stream"] = serde_json::Value::Bool(true);
+    // Request usage stats in stream (supported by OpenAI, vLLM, Ollama).
+    body["stream_options"] = serde_json::json!({"include_usage": true});
 
     let mut req = client.post(&url).json(&body);
     if let Some(key) = api_key {
