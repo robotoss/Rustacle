@@ -406,6 +406,12 @@ async fn run_llm_turn(
 
     let name = profile_name.unwrap_or("default");
 
+    tracing::info!(
+        profile = name,
+        count = profiles_json.len(),
+        "loading model profile"
+    );
+
     let profile = profiles_json
         .iter()
         .find(|p| p.get("name").and_then(serde_json::Value::as_str) == Some(name))
@@ -469,6 +475,14 @@ async fn run_llm_turn(
         Some(api_key)
     };
 
+    tracing::info!(
+        provider = provider_str,
+        llm_model = %model,
+        base = %effective_base,
+        has_key = key.is_some(),
+        "connecting to LLM"
+    );
+
     // Build the provider (OpenAI-compatible for all providers for now).
     let llm = OpenAiProvider::new(effective_base, key);
 
@@ -505,7 +519,16 @@ async fn run_llm_turn(
     // Stream the response — cancellable.
     let stream = tokio::select! {
         r = llm.stream(chat_request, cancel.clone()) => {
-            r.map_err(|e| format!("LLM connection failed: {e}"))?
+            match r {
+                Ok(s) => {
+                    tracing::info!("LLM stream connected");
+                    s
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "LLM stream failed");
+                    return Err(format!("LLM connection failed: {e}"));
+                }
+            }
         }
         () = cancel.cancelled() => {
             return Err("Cancelled".to_owned());
@@ -566,6 +589,13 @@ async fn run_llm_turn(
             Err(e) => return Err(format!("Stream error: {e}")),
         }
     }
+
+    tracing::info!(
+        chars = full_text.len(),
+        input_tokens,
+        output_tokens,
+        "LLM turn complete"
+    );
 
     // Emit the final answer.
     if full_text.is_empty() {
